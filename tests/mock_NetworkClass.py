@@ -13,7 +13,7 @@ class mock_Network(object):
         self.responseData = None
 
     def __del__(self):
-        self.connection.close()
+        self.dissconnect()
 
     def connect(self):
         # Don't communicate with printer in this MOCK class.

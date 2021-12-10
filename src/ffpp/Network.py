@@ -13,7 +13,7 @@ class Network(object):
         self.responseData = None
 
     def __del__(self):
-        self.connection.close()
+        self.dissconnect()
 
     def connect(self):
         self.connection = socket.socket()

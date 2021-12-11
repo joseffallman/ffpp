@@ -1,9 +1,11 @@
+import os
 import unittest
 from unittest import mock
 
 from src.ffpp.Network import Network
 
 PRINTER_IP = "192.168.50.64"
+CONNECT_TO_PRINTER = os.environ.get('CONNECT_TO_PRINTER', False)
 
 
 class TestNetworkClass(unittest.TestCase):
@@ -56,6 +58,7 @@ class TestNetworkClass(unittest.TestCase):
         self.assertFalse(response)
 
 
+@unittest.skipIf(CONNECT_TO_PRINTER, "Only run this localy")
 class TestNetworkCommunicateWithPrinter(unittest.TestCase):
     """ Class to test the communication with a real Flashforge printer."""
 

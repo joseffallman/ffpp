@@ -17,7 +17,7 @@ class test_PrinterClass(unittest.TestCase):
         self.printer = Printer(PRINTER_IP)
         self.printer.network = Network(PRINTER_IP, 8899)
         self.patch_socket = mock.patch('src.ffpp.Network.socket')
-        self.patch_socket.start()
+        self.mock_socket = self.patch_socket.start()
 
     def tearDown(self):
         self.patch_socket.stop()
@@ -46,11 +46,10 @@ class test_PrinterClass(unittest.TestCase):
         self.assertTrue(self.printer.connected == ConnectionStatus.OBSERVER,
                         f"{self.printer.connected}")
 
+    # @mock.patch('src.ffpp.Network')
     def test_ConnectionToPrinter_ConnectionFail(self):
         # Arrange
-        self.printer.network = mock_Network_control_as_observer(
-            PRINTER_IP, 8899
-        )
+        self.mock_socket.socket().connect.side_effect = TimeoutError
 
         # Act
         self.printer.connect()
@@ -60,7 +59,7 @@ class test_PrinterClass(unittest.TestCase):
             self.printer.connected == ConnectionStatus.DISSCONNECTED,
             (
                 f"Connected is {self.printer.connected},"
-                f" expected 'OBSERVER'."
+                f" expected 'Dissconnected'."
             )
         )
 

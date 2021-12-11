@@ -1,11 +1,62 @@
 import unittest
+from unittest import mock
 
 from src.ffpp.Network import Network
 
 PRINTER_IP = "192.168.50.64"
 
 
-class TestNetwork(unittest.TestCase):
+class TestNetworkClass(unittest.TestCase):
+    """ Class to test the behavior of the Network class
+    """
+    @mock.patch('src.ffpp.Network.socket')
+    def test_printerSendControlBeforeConnect_ConnectFirst(self, mock_socket):
+        # Arrange
+        net = Network(PRINTER_IP)
+        mock_socket.socket().connect.return_value = True
+
+        # Act
+        response = net.sendMessage("hej")
+
+        # Assert
+        # No exception occurred, test responseData
+        mock_socket.socket().connect.assert_called_once()
+        self.assertTrue(response)
+
+    @mock.patch('src.ffpp.Network.socket')
+    def test_printerSendFailFirst_ReconnectAndResend(self, mock_socket):
+        # Arrange
+        net = Network(PRINTER_IP)
+        # mock_socket.socket().connect.return_value = True
+        mock_socket.socket().sendall.side_effect = [OSError, True]
+
+        # Act
+        net.connect()
+        response = net.sendMessage("hej")
+
+        # Assert
+        # No exception occurred, test responseData
+        self.assertEqual(mock_socket.socket().connect.call_count, 2)
+        self.assertTrue(response)
+
+    @mock.patch('src.ffpp.Network.socket')
+    def test_printerSendFailFirst_UnableToReconnectAndResend(self, mock_socket):  # noqa
+        # Arrange
+        net = Network(PRINTER_IP)
+        mock_socket.socket().connect.side_effect = [True, OSError]
+        mock_socket.socket().sendall.side_effect = [OSError, True]
+
+        # Act
+        net.connect()
+        response = net.sendMessage("hej")
+
+        # Assert
+        # No exception occurred, test responseData
+        self.assertEqual(mock_socket.socket().connect.call_count, 2)
+        self.assertFalse(response)
+
+
+class TestNetworkCommunicateWithPrinter(unittest.TestCase):
     """ Class to test the communication with a real Flashforge printer."""
 
     def test_printerConnect_noException(self):
@@ -13,30 +64,14 @@ class TestNetwork(unittest.TestCase):
         net = Network(PRINTER_IP)
 
         # Act
-        try:
-            net.connect()
-        except Exception:
-            self.fail("Network.connect() throw an exception.")
+        successfull = net.connect()
 
         # Assert
         # No exception occurred, test responseData.
-        self.assertIsNone(net.responseData, "responseData is None")
-
-    def test_printerSendControlBeforeConnect_noException(self):
-        # Arrange
-        net = Network(PRINTER_IP)
-
-        # Act
-        try:
-            response = net.sendControlRequest()
-        except Exception:
-            self.fail("sendControlMessage throw an exception.")
-
-        # Assert
-        # No exception occurred, test responseData.
-        self.assertIsNotNone(response, "responseData is None")
-        self.assertTrue("CMD M601 Received" in response,
-                        "Wrong message from printer.")
+        self.assertTrue(successfull, (
+            "Unable to connect to printer.",
+            "Check Power/IP/ethernet/wlan connection etc. "
+        ))
 
     def test_getInfofromPrinter_expectedResult(self):
         # Arrange

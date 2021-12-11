@@ -1,51 +1,13 @@
-import socket
 import logging
-import re
+
+from src.ffpp.Network import Network
 
 LOG = logging.getLogger(__name__)
 
 
-class mock_Network(object):
+class mock_Network(Network):
     def __init__(self, ip, port=8899):
-        self.ip = ip
-        self.port = port
-        self.connection = None
-        self.responseData = None
-
-    def __del__(self):
-        self.dissconnect()
-
-    def connect(self):
-        # Don't communicate with printer in this MOCK class.
-
-        self.connection = socket.socket()
-        self.connection.settimeout(5)
-        try:
-            # self.connection.connect((self.ip, self.port))
-            pass
-        except socket.error:
-            LOG.info("Unable to connect")
-            self.connection = None
-            return False
-        return True
-        # self.sendControlMessage()
-
-    def dissconnect(self):
-        if self.connection is not None:
-            self.connection.close()
-            self.connection = None
-
-    def sendMessage(self, message, decode=True):
-        self.responseData = None
-
-        # Make sure we are connected first.
-        if self.connection is None:
-            self.connect()
-
-        if type(message) is not bytes:
-            message = message.encode()
-
-        # Don't communicate with the printer in this MOCK class
+        super().__init__(ip, port=port)
 
     def sendControlRequest(self):
         """Send Control message to printer.
@@ -101,15 +63,6 @@ class mock_Network(object):
         self.sendMessage('~M105\r\n')
         self.responseData = 'CMD M105 Received.\r\nT0:22/0 B:14/0\r\nok\r\n'
 
-        temps = re.findall(r'([TB]\d?):(\d+)/(\d+)', self.responseData)
-
-        ret = []
-        for temp in temps:
-            ret.append({
-                'Object': temp[0],
-                'Temperature': temp[1],
-                'TargetTemp': temp[2]
-            })
         return self.responseData
 
     def sendPositionRequest(self):
@@ -198,21 +151,6 @@ class mock_Network(object):
 class mock_Network_control_as_observer(mock_Network):
     def __init__(self, ip, port=8899):
         super().__init__(ip, port=port)
-
-    def connect(self):
-        # Don't communicate with printer in this MOCK class.
-        # This will simulate a connection timeout.
-
-        self.connection = socket.socket()
-        self.connection.settimeout(5)
-        try:
-            # self.connection.connect((self.ip, self.port))
-            raise socket.timeout
-        except socket.error:
-            LOG.info("Unable to connect")
-            self.connection = None
-            return False
-        return True
 
     def sendControlRequest(self):
         """Send Control message to printer.

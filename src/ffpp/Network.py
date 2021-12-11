@@ -1,6 +1,5 @@
 import socket
 import logging
-import re
 
 LOG = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ class Network(object):
         self.connection.settimeout(5)
         try:
             self.connection.connect((self.ip, self.port))
-        except socket.error:
+        except OSError:
             LOG.info("Unable to connect")
             self.connection = None
             return False
@@ -44,7 +43,7 @@ class Network(object):
 
         try:
             self.connection.sendall(message)
-        except socket.error:
+        except OSError:
             LOG.info("Unable to send message. Reconnecting...")
 
             if self.connect():
@@ -53,11 +52,18 @@ class Network(object):
                 except socket.error:
                     LOG.info("Printer seems to be unavailable.")
                     return False
+            else:
+                LOG.info("Printer seems to be unavailable.")
+                return False
 
         # Update responseData
         self.responseData = self.connection.recv(1024)
         if decode:
             self.responseData = self.responseData.decode()
+
+        if self.responseData is not None:
+            return True
+        return False
 
     def sendControlRequest(self):
         """Send Control message to printer.
@@ -131,15 +137,6 @@ class Network(object):
         """
         self.sendMessage('~M105\r\n')
 
-        temps = re.findall(r'([TB]\d?):(\d+)/(\d+)', self.responseData)
-
-        ret = []
-        for temp in temps:
-            ret.append({
-                'Object': temp[0],
-                'Temperature': temp[1],
-                'TargetTemp': temp[2]
-            })
         return self.responseData
 
     def sendPositionRequest(self):

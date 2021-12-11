@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from src.ffpp.Printer import ConnectionStatus, Printer
 # from src.ffpp.Network import Network
@@ -15,6 +16,11 @@ class test_PrinterClass(unittest.TestCase):
     def setUp(self):
         self.printer = Printer(PRINTER_IP)
         self.printer.network = Network(PRINTER_IP, 8899)
+        self.patch_socket = mock.patch('src.ffpp.Network.socket')
+        self.patch_socket.start()
+
+    def tearDown(self):
+        self.patch_socket.stop()
 
     def test_ConnectionToPrinter_ConnectionStatusAsController(self):
         # Arrange

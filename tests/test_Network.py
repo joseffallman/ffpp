@@ -1,4 +1,3 @@
-import os
 import socket
 import unittest
 from unittest import mock

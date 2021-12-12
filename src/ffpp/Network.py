@@ -21,7 +21,7 @@ class Network(object):
             self.connection.connect((self.ip, self.port))
         except OSError:
             LOG.info("Unable to connect")
-            self.connection = None
+            self.dissconnect()
             return False
         return True
         # self.sendControlMessage()

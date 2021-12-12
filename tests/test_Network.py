@@ -1,11 +1,12 @@
 import os
+import socket
 import unittest
 from unittest import mock
 
 from src.ffpp.Network import Network
 
 PRINTER_IP = "192.168.50.64"
-CONNECT_TO_PRINTER = os.environ.get('CONNECT_TO_PRINTER', False)
+PRINTER_PORT = 8000
 
 
 class TestNetworkClass(unittest.TestCase):
@@ -58,9 +59,21 @@ class TestNetworkClass(unittest.TestCase):
         self.assertFalse(response)
 
 
-@unittest.skipIf(CONNECT_TO_PRINTER, "Only run this localy")
 class TestNetworkCommunicateWithPrinter(unittest.TestCase):
     """ Class to test the communication with a real Flashforge printer."""
+
+    @classmethod
+    def setUpClass(cls):
+        # Test if response, else skip TestCase
+        try:
+            with socket.socket() as s:
+                s.settimeout(5)
+                s.connect((PRINTER_IP, PRINTER_PORT))
+        except Exception:
+            cls.skipTest(
+                cls,
+                f"There is no printer at this ip: {PRINTER_IP}:{PRINTER_PORT}"
+            )
 
     def test_printerConnect_noException(self):
         # Arrange

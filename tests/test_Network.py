@@ -1,64 +1,64 @@
 import socket
 import unittest
 from unittest import mock
+import asyncio
 
 from src.ffpp.Network import Network
 
 PRINTER_IP = "192.168.50.64"
-PRINTER_PORT = 8000
+PRINTER_PORT = 8899
 
 
-class TestNetworkClass(unittest.TestCase):
+class TestNetworkClass(unittest.IsolatedAsyncioTestCase):
     """ Class to test the behavior of the Network class
     """
-    @mock.patch('src.ffpp.Network.socket')
-    def test_printerSendControlBeforeConnect_ConnectFirst(self, mock_socket):
+
+    def setUp(self):
+        self.network = Network(PRINTER_IP, 8899)
+        self.patch_con = mock.patch(
+            'src.ffpp.Network.asyncio',
+            new_callable=mock.AsyncMock
+        )
+        self.mock_con = self.patch_con.start()
+        self.mockReturnValue()
+
+    def tearDown(self):
+        self.patch_con.stop()
+
+    def mockReturnValue(self, returnMessage: list[str] | str = []):
+        # Mock socket connection.
+        reader = mock.AsyncMock()
+        # reader.read.return_value = returnMessage.encode('utf-8')
+
+        if type(returnMessage) is not list:
+            returnMessage = [returnMessage]
+
+        ret = []
+        for msg in returnMessage:
+            ret.append(msg.encode('utf-8'))
+
+        reader.read.side_effect = ret  # returnMessage.encode('utf-8')
+        self.mock_con.wait_for.return_value = (
+            reader,  # reader
+            mock.AsyncMock(),  # writer
+        )
+
+    # @mock.patch('src.ffpp.Network.asyncio', new=mock.AsyncMock)
+    async def test_printerSendFailFirst_UnableToReconnectAndResend(self):  # noqa
         # Arrange
         net = Network(PRINTER_IP)
-        mock_socket.socket().connect.return_value = True
+        self.mockReturnValue(["Hej", "Två"])
 
         # Act
-        response = net.sendMessage("hej")
+        response = await net.sendMessage(["msg1", "msg2"])
 
         # Assert
         # No exception occurred, test responseData
-        mock_socket.socket().connect.assert_called_once()
-        self.assertTrue(response)
-
-    @mock.patch('src.ffpp.Network.socket')
-    def test_printerSendFailFirst_ReconnectAndResend(self, mock_socket):
-        # Arrange
-        net = Network(PRINTER_IP)
-        # mock_socket.socket().connect.return_value = True
-        mock_socket.socket().sendall.side_effect = [OSError, True]
-
-        # Act
-        net.connect()
-        response = net.sendMessage("hej")
-
-        # Assert
-        # No exception occurred, test responseData
-        self.assertEqual(mock_socket.socket().connect.call_count, 2)
-        self.assertTrue(response)
-
-    @mock.patch('src.ffpp.Network.socket')
-    def test_printerSendFailFirst_UnableToReconnectAndResend(self, mock_socket):  # noqa
-        # Arrange
-        net = Network(PRINTER_IP)
-        mock_socket.socket().connect.side_effect = [True, OSError]
-        mock_socket.socket().sendall.side_effect = [OSError, True]
-
-        # Act
-        net.connect()
-        response = net.sendMessage("hej")
-
-        # Assert
-        # No exception occurred, test responseData
-        self.assertEqual(mock_socket.socket().connect.call_count, 2)
+        # self.assertEqual(mock_socket.socket().connect.call_count, 2)
         self.assertFalse(response)
 
 
-class TestNetworkCommunicateWithPrinter(unittest.TestCase):
+class TestNetworkCommunicateWithPrinter(unittest.IsolatedAsyncioTestCase):
     """ Class to test the communication with a real Flashforge printer."""
 
     @classmethod
@@ -68,92 +68,89 @@ class TestNetworkCommunicateWithPrinter(unittest.TestCase):
             with socket.socket() as s:
                 s.settimeout(5)
                 s.connect((PRINTER_IP, PRINTER_PORT))
+                s.close()
         except Exception:
             cls.skipTest(
                 cls,
                 f"There is no printer at this ip: {PRINTER_IP}:{PRINTER_PORT}"
             )
 
-    def test_printerConnect_noException(self):
+    async def test_printerConnect_noException(self):
+        # Arrange
+        net = Network("192.168.0.32")
+
+        # Act & Assert...
+        with self.assertRaises(TimeoutError):
+            await net.connect()
+# ("Unable to connect to printer.",
+#              "Check Power/IP/ethernet/wlan connection etc. ")
+
+    async def test_getInfofromPrinter_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
 
         # Act
-        successfull = net.connect()
-
-        # Assert
-        # No exception occurred, test responseData.
-        self.assertTrue(successfull, (
-            "Unable to connect to printer.",
-            "Check Power/IP/ethernet/wlan connection etc. "
-        ))
-
-    def test_getInfofromPrinter_expectedResult(self):
-        # Arrange
-        net = Network(PRINTER_IP)
-
-        # Act
-        response = net.sendInfoRequest()
+        response = await net.sendInfoRequest()
 
         # Assert
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M115 Received" in response,
                         "Wrong message from printer.")
 
-    def test_getProgress_expectedResult(self):
+    async def test_getProgress_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
 
         # Act
-        response = net.sendProgressRequest()
+        response = await net.sendProgressRequest()
 
         # Assert
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M27 Received" in response,
                         "Wrong message from printer.")
 
-    def test_getTemperature_expectedResult(self):
+    async def test_getTemperature_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
 
         # Act
-        response = net.sendTempRequest()
+        response = await net.sendTempRequest()
 
         # Assert
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M105 Received" in response,
                         "Wrong message from printer.")
 
-    def test_getPosiotion_expectedResult(self):
+    async def test_getPosiotion_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
 
         # Act
-        response = net.sendPositionRequest()
+        response = await net.sendPositionRequest()
 
         # Assert
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M114 Received" in response,
                         "Wrong message from printer.")
 
-    def test_getStatus_expectedResult(self):
+    async def test_getStatus_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
 
         # Act
-        response = net.sendStatusRequest()
+        response = await net.sendStatusRequest()
 
         # Assert
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M119 Received" in response,
                         "Wrong message from printer.")
 
-    def test_getFileList_expectedResult(self):
+    async def test_getFileList_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
 
         # Act
-        files = net.sendGetFileNames()
+        files = await net.sendGetFileNames()
 
         # Assert
         self.assertIsNotNone(net.responseData, "responseData is None")
@@ -161,45 +158,57 @@ class TestNetworkCommunicateWithPrinter(unittest.TestCase):
                         "Wrong message from printer.")
         self.assertTrue(len(files) > 0, "There is no files on printer?")
 
-    def test_setTemperature_expectedResult(self):
+    async def test_setTemperature_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
         net.sendControlRequest()
 
         # Act
-        response = net.sendSetTemperature(40)
-        net.sendTempRequest()
+        response = await net.sendSetTemperature(40)
+        response2 = await net.sendTempRequest()
         # response2 = net.responseData
-        net.sendSetTemperature(0)  # Restore temperature.
+        await asyncio.sleep(5)
+        await net.sendSetTemperature(0)  # Restore temperature.
 
         # Assert
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M104 Received" in response,
                         "Wrong message from printer.")
+        self.assertIsNotNone(response2, "responseData is None")
         # self.assertTrue("T0:40" in response2, "Temperature not set")
 
-    def test_pausePrint_expectedResult(self):
+    async def test_pausePrint_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
-        net.sendControlRequest()
 
         # Act
-        response = net.sendPauseRequest()
+        response = await net.sendPauseRequest()
 
         # Assert
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M25 Received" in response,
                         "Wrong message from printer.")
 
-    def test_continuePrint_expectedResult(self):
+    async def test_continuePrint_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
-        net.sendControlRequest()
 
         # Act
-        response = net.sendContinueRequest()
+        response = await net.sendContinueRequest()
 
         # Assert
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M24 Received" in response,
+                        "Wrong message from printer.")
+
+    async def test_abortPrint_expectedResult(self):
+        # Arrange
+        net = Network(PRINTER_IP)
+
+        # Act
+        response = await net.sendAbortRequest()
+
+        # Assert
+        self.assertIsNotNone(response, "responseData is None")
+        self.assertTrue("CMD M26 Received" in response,
                         "Wrong message from printer.")

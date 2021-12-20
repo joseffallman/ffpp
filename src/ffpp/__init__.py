@@ -1,6 +1,7 @@
 import logging
 
-from .Printer import Printer  # noqa
+# from .Printer
+from . import Printer  # noqa
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)

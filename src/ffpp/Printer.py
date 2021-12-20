@@ -10,7 +10,7 @@ LOG = logging.getLogger(__name__)
 
 class ConnectionStatus(IntEnum):
     DISSCONNECTED = 0
-    OBSERVER = 1
+    CONNECTED = 1
     CONTROL = 2
 
 
@@ -28,87 +28,156 @@ class field(object):
         return self.name
 
 
+class temperatures(object):
+    def __init__(self, name, temp, target=None):
+        self.name = name
+        self.now = int(temp)
+        self.target = int(target)
+
+
 class Printer(object):
+
     def __init__(self, ip, port=8899):
         # Instance Variables
-        self.connected = ConnectionStatus.DISSCONNECTED
+        self.connected: ConnectionStatus = ConnectionStatus.DISSCONNECTED
         self.network = Network(ip, port)
 
         # Machine info fields
-        self.machine_type = field(
+        self._machine_type = field(
             "Machine Type", None, "Machine Type\s?:\s?(.*?)\\r\\n")  # noqa
-        self.machine_name = field(
+        self._machine_name = field(
             "Machine Name", None, "Machine Name\s?:\s?(.*?)\\r\\n")  # noqa
-        self.firmware = field(
+        self._firmware = field(
             "Firmware", None, "Firmware\s?:\s?(.*?)\\r\\n")  # noqa
-        self.machine_SN = field(
+        self._machine_SN = field(
             "Machine SN", None, "SN\s?:\s?(.*?)\\r\\n")  # noqa
-        self.maxX = field(
+        self._maxX = field(
             "MaxX", None, "X\s?:\s?(\d+)(?:\s|\\r\\n)")  # noqa
-        self.maxY = field(
+        self._maxY = field(
             "MaxY", None, "Y\s?:\s?(\d+)(?:\s|\\r\\n)")  # noqa
-        self.maxZ = field(
+        self._maxZ = field(
             "MaxZ", None, "Z\s?:\s?(\d+)(?:\s|\\r\\n)")  # noqa
-        self.extruder_count = field(
+        self._extruder_count = field(
             "Extruder Count", None, "Tool Count\s?:\s?(.*?)\\r\\n")  # noqa
-        self.mac_address = field(
+        self._mac_address = field(
             "Mac Address", None, "Mac Address\s?:\s?([0-9a-fA-F:]+)")  # noqa
-        self.machine_status = field(
+        self._machine_status = field(
             "Machine Status", None, "MachineStatus\s?:\s?(.*?)\\r\\n")  # noqa
-        self.move_mode = field(
+        self._move_mode = field(
             "Move Mode", None, "MoveMode\s?:\s?(.*?)\\r\\n")  # noqa
-        self.status = field(
+        self._status = field(
             "Status", None, "Status\s?:\s?(.*?)\\r\\n")  # noqa
-        self.led = field(
+        self._led = field(
             "LED", None, "LED\s?:\s?(.*?)\\r\\n")  # noqa
-        self.current_file = field(
+        self._current_file = field(
             "Current File", None, "CurrentFile\s?:\s?(.*?)\\r\\n")  # noqa
-        self.extruder_temp = field(
-            "Extruder Temp", None, "T0\s?:\s?(\d+)/(\d*)")  # noqa
-        self.extruder_target_temp = field(
-            "Extruder Target Temp", None, "T0\s?:\s?\d+/(\d*)")  # noqa
-        self.bed_temp = field(
-            "Bed Temp", None, "B\s?:\s?(\d+)/(\d*)")  # noqa
-        self.bed_target_temp = field(
-            "Bed Target Temp", None, "B\s?:\s?\d+/(\d*)")  # noqa
-        self.print_percent = field(
+        self._extruder_temp = field(
+            "Extruder Temp", None, "(T0)\s?:\s?(\d+)/(\d*)")  # noqa
+        self._bed_temp = field(
+            "Bed Temp", None, "(B)\s?:\s?(\d+)/(\d*)")  # noqa
+        self._print_percent = field(
             "Print Percent", None, "byte\s?(\d)/\d+")  # noqa
 
-    def connect(self):
+        self.extruders = {}
+
+        self.beds = {}
+
+    async def connect(self):
         if self.connected is ConnectionStatus.DISSCONNECTED:
-            if self.network.connect():
-                self.connected = ConnectionStatus.OBSERVER
+            connected = False
+            try:
+                connected = await self.network.connect()
+            except TimeoutError:
+                raise
 
-                self.updateMachineInfo()
-                self.update()
+            if connected:
+                self.connected = ConnectionStatus.CONNECTED
 
-                return True
-        return False
+                await self.updateMachineInfo()
+                await self.update()
 
-    def requestControl(self):
-        response = self.network.sendControlRequest()
-        if "Control Success" in response:
-            self.connected = ConnectionStatus.CONTROL
-        elif "Control failed" in response:
-            self.connected = ConnectionStatus.OBSERVER
+        return True
 
-    def updateMachineInfo(self):
+    @property
+    def machine_type(self):
+        return self._machine_type.value
+
+    @property
+    def machine_name(self):
+        return self._machine_name.value
+
+    @property
+    def firmware(self):
+        return self._firmware.value
+
+    @property
+    def serial(self):
+        return self._machine_SN.value
+
+    @property
+    def maxX(self):
+        return self._maxX.value
+
+    @property
+    def maxY(self):
+        return self._maxY.value
+
+    @property
+    def maxZ(self):
+        return self._maxZ.value
+
+    @property
+    def extruder_count(self):
+        return self._extruder_count.value
+
+    @property
+    def mac_address(self):
+        return self._mac_address.value
+
+    @property
+    def machine_status(self):
+        return self._machine_status.value
+
+    @property
+    def move_mode(self):
+        return self._move_mode.value
+
+    @property
+    def status(self):
+        return self._status.value
+
+    @property
+    def led(self):
+        return self._led.value
+
+    @property
+    def current_file(self):
+        return self._current_file.value
+
+    @property
+    def print_percent(self):
+        return self._print_percent.value
+
+    async def updateMachineInfo(self):
         if not self.connected:
             LOG.info("Machine is not connected")
             if not self.connect():
                 return
 
-        response = self.network.sendInfoRequest()
+        response = await self.network.sendInfoRequest()
+        if not response:
+            return
+
         dataField = [
-            self.machine_type,
-            self.machine_name,
-            self.firmware,
-            self.machine_SN,
-            self.maxX,
-            self.maxY,
-            self.maxZ,
-            self.extruder_count,
-            self.mac_address
+            self._machine_type,
+            self._machine_name,
+            self._firmware,
+            self._machine_SN,
+            self._maxX,
+            self._maxY,
+            self._maxZ,
+            self._extruder_count,
+            self._mac_address
         ]
 
         for field in dataField:
@@ -116,7 +185,7 @@ class Printer(object):
             if re_result:
                 field.value = re_result.group(1)
 
-    def update(self):
+    async def update(self):
         if not self.connected:
             LOG.info("Machine is not connected")
             self.connect()
@@ -132,14 +201,16 @@ class Printer(object):
         CurrentFile: \r\n
         ok\r\n'
         """
-        response = self.network.sendStatusRequest()
+        response = await self.network.sendStatusRequest()
+        if not response:
+            return
 
         dataField = [
-            self.machine_status,
-            self.move_mode,
-            self.status,
-            self.led,
-            self.current_file
+            self._machine_status,
+            self._move_mode,
+            self._status,
+            self._led,
+            self._current_file
         ]
 
         for field in dataField:
@@ -151,31 +222,36 @@ class Printer(object):
         """
         'CMD M105 Received.\r\nT0:22/0 B:14/0\r\nok\r\n'
         """
-        response = self.network.sendTempRequest()
+        response = await self.network.sendTempRequest()
+        if not response:
+            return
 
-        dataField = [
-            self.extruder_temp,
-            self.extruder_target_temp,
-            self.bed_temp,
-            self.bed_target_temp
-        ]
-
-        re_result = self.extruder_temp.regex.search(response)
+        re_result = self._extruder_temp.regex.search(response)
         if re_result:
-            self.extruder_temp.value = re_result.group(1)
-            self.extruder_target_temp.value = re_result.group(2)
+            name = re_result.group(1)
+            now = re_result.group(2)
+            target = re_result.group(3)
+            t = temperatures(name, now, target)
+            self.extruders[name] = t
 
-        re_result = self.extruder_temp.regex.search(response)
+        re_result = self._bed_temp.regex.search(response)
         if re_result:
-            self.bed_temp.value = re_result.group(1)
-            self.bed_target_temp.value = re_result.group(2)
+            name = re_result.group(1)
+            now = re_result.group(2)
+            target = re_result.group(3)
+            t = temperatures(name, now, target)
+            self.beds[name] = t
+            # self._bed_temp.value = re_result.group(2)
+            # self._bed_target_temp.value = re_result.group(3)
 
         # Update print progress.
         """
         'CMD M27 Received.\r\nSD printing byte 0/100\r\nok\r\n'
         """
-        response = self.network.sendProgressRequest()
+        response = await self.network.sendProgressRequest()
+        if not response:
+            return
 
-        re_result = self.print_percent.regex.search(response)
+        re_result = self._print_percent.regex.search(response)
         if re_result:
-            self.print_percent.value = re_result.group(1)
+            self._print_percent.value = re_result.group(1)

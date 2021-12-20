@@ -110,6 +110,34 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
             f"{self.printer.connected}"
         )
 
+    async def test_updateMachineInfoTimeoutToPrinter_Exception(self):
+        # Arrange
+        self.mock_net().connect.side_effect = TimeoutError
+
+        # Act
+        with self.assertRaises(TimeoutError):
+            await self.printer.updateMachineInfo()
+
+        # Assert
+        self.assertTrue(
+            self.printer.connected == ConnectionStatus.DISSCONNECTED,
+            f"{self.printer.connected}"
+        )
+
+    async def test_updateTimeoutToPrinter_Exception(self):
+        # Arrange
+        self.mock_net().connect.side_effect = TimeoutError
+
+        # Act
+        with self.assertRaises(TimeoutError):
+            await self.printer.update()
+
+        # Assert
+        self.assertTrue(
+            self.printer.connected == ConnectionStatus.DISSCONNECTED,
+            f"{self.printer.connected}"
+        )
+
     async def test_getBasicInfoAtConnect_getBasicInfo(self):
         # Arrage
 
@@ -142,11 +170,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
             self.printer.status,
             self.printer.led,
             self.printer.current_file,
-            # self.printer.extruder_temp,
-            # self.printer.extruder_target_temp,
-            # self.printer.bed_temp,
-            # self.printer.bed_target_temp,
-            self.printer.print_percent
+            self.printer.print_percent,
         ]
 
         # Assert
@@ -158,13 +182,73 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
 
         # Act
         await self.printer.update()
-        extruder = list(self.printer.extruders.values())[0]
-        bed = list(self.printer.beds.values())[0]
+        extruder = self.printer.extruder_tools.get()
+        bed = self.printer.bed_tools.get()
 
         # Assert
-        self.assertTrue(len(self.printer.extruders) == 1)
+        self.assertTrue(len(self.printer.extruder_tools) == 1)
         self.assertTrue(extruder.now == 22)
         self.assertTrue(extruder.target == 0)
-        self.assertTrue(len(self.printer.beds) == 1)
+        self.assertTrue(len(self.printer.bed_tools) == 1)
         self.assertTrue(bed.now == 14)
         self.assertTrue(bed.target == 0)
+
+    async def test_toolHandlerAdd_CorrectCount(self):
+        # Arrange
+        from src.ffpp.Printer import ToolHandler, temperatures
+        th = ToolHandler()
+
+        # Act
+        th.add(temperatures("extruder", "5", "210"))
+        th.add(temperatures("extruder", "15", "210"))
+
+        # Assert
+        self.assertTrue(
+            len(th) == 2, f"Toolhandler is only {len(th)}, expected 2")
+
+    async def test_toolHandlerGet_CorrectReturn(self):
+        # Arrange
+        from src.ffpp.Printer import ToolHandler, temperatures
+        th = ToolHandler()
+        extruder1 = temperatures("exTruder1", "5", "210")
+        extruder2 = temperatures("exTruder2", "15", "210")
+        th.add(extruder1)
+        th.add(extruder2)
+
+        # Act
+        ret_extruder1 = th.get()  # Return first
+        ret_extruder2 = th.get("Extruder2")  # Return extruder2
+        ret_extruder85 = th.get("Extruder85")  # Return None
+
+        # Assert
+        self.assertTrue(
+            ret_extruder1 == extruder1, "Toolhandler did'nt return first extruder.")
+        self.assertTrue(
+            ret_extruder2 == extruder2, "Toolhandler did'nt return specific extruder.")
+        self.assertIsNone(ret_extruder85)
+
+    async def test_toolHandlerDelete_deleteCorrect(self):
+        # Arrange
+        from src.ffpp.Printer import ToolHandler, temperatures
+        th = ToolHandler()
+        extruder1 = temperatures("exTruder1", "5", "210")
+        extruder2 = temperatures("exTruder2", "15", "210")
+        extruder3 = temperatures("exTruder3", "15", "210")
+        th.add(extruder1)
+        th.add(extruder2)
+        th.add(extruder3)
+
+        # Act
+        ret_extruder2 = th.delete("extruder2")  # Delete and return extruder2
+        ret_extruder85 = th.delete("extruder85")  # retrun None
+
+        # Assert
+        self.assertTrue(
+            ret_extruder2 == extruder2,
+            "Toolhandler did'nt return specific extruder."
+        )
+        self.assertTrue(
+            len(th) == 2,
+            f"Toolhandler is only {len(th)}, expected 2"
+        )
+        self.assertIsNone(ret_extruder85)

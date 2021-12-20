@@ -30,9 +30,48 @@ class field(object):
 
 class temperatures(object):
     def __init__(self, name, temp, target=None):
-        self.name = name
+        self.name = name.lower()
         self.now = int(temp)
         self.target = int(target)
+
+
+class ToolHandler(object):
+
+    def __init__(self):
+        self._tools: dict[str, temperatures] = {}
+        pass
+
+    def __iter__(self):
+        return iter(self._tools)
+
+    def __len__(self):
+        return len(self._tools)
+
+    def get(self, name: str = None):
+        """Return named temperature or first one.
+
+        Args:
+            name (str, optional): Named temperature. Defaults to None.
+
+        Returns:
+            [temperatures]: Temperature object
+        """
+        if len(self._tools) <= 0:
+            return None
+
+        if not name:
+            return list(self._tools.values())[0]
+
+        try:
+            return self._tools[name.lower()]
+        except KeyError:
+            return None
+
+    def add(self, t: temperatures):
+        self._tools[t.name] = t
+
+    def delete(self, name: str):
+        return self._tools.pop(name.lower(), None)
 
 
 class Printer(object):
@@ -78,9 +117,9 @@ class Printer(object):
         self._print_percent = field(
             "Print Percent", None, "byte\s?(\d)/\d+")  # noqa
 
-        self.extruders = {}
+        self.extruder_tools = ToolHandler()
 
-        self.beds = {}
+        self.bed_tools = ToolHandler()
 
     async def connect(self):
         if self.connected is ConnectionStatus.DISSCONNECTED:
@@ -161,8 +200,7 @@ class Printer(object):
     async def updateMachineInfo(self):
         if not self.connected:
             LOG.info("Machine is not connected")
-            if not self.connect():
-                return
+            await self.connect()
 
         response = await self.network.sendInfoRequest()
         if not response:
@@ -188,7 +226,7 @@ class Printer(object):
     async def update(self):
         if not self.connected:
             LOG.info("Machine is not connected")
-            self.connect()
+            await self.connect()
 
         # Update current status etc.
         """
@@ -232,7 +270,7 @@ class Printer(object):
             now = re_result.group(2)
             target = re_result.group(3)
             t = temperatures(name, now, target)
-            self.extruders[name] = t
+            self.extruder_tools.add(t)
 
         re_result = self._bed_temp.regex.search(response)
         if re_result:
@@ -240,7 +278,7 @@ class Printer(object):
             now = re_result.group(2)
             target = re_result.group(3)
             t = temperatures(name, now, target)
-            self.beds[name] = t
+            self.bed_tools.add(t)
             # self._bed_temp.value = re_result.group(2)
             # self._bed_target_temp.value = re_result.group(3)
 

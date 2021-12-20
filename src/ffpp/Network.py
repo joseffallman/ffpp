@@ -40,6 +40,7 @@ class Network(object):
             while len(messages) > 0:
                 send = messages.pop(0)
                 self._writer.write(send.encode())
+                await self._writer.drain()  # Wait for it to be sent.
                 data = await self._reader.read(1024)
                 if data:
                     self.responseData.append(data)

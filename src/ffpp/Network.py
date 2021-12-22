@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import typing
 
 LOG = logging.getLogger(__name__)
 
@@ -9,7 +10,7 @@ class Network(object):
         self.ip = ip
         self.port = port
         self.connection = None
-        self.responseData: list[bytes] | None = None
+        self.responseData: typing.Union[list[bytes], None] = None
 
     async def connect(self):
         error = False

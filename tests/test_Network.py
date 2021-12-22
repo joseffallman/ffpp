@@ -1,4 +1,5 @@
 import socket
+import typing
 import unittest
 from unittest import mock
 import asyncio
@@ -25,7 +26,10 @@ class TestNetworkClass(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         self.patch_con.stop()
 
-    def mockReturnValue(self, returnMessage: list[str] | str = []):
+    def mockReturnValue(
+        self,
+        returnMessage: typing.Union[list[str], str] = []
+    ):
         # Mock socket connection.
         reader = mock.AsyncMock()
         # reader.read.return_value = returnMessage.encode('utf-8')

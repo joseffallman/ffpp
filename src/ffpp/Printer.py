@@ -2,6 +2,7 @@
 from enum import IntEnum
 import logging
 import re
+import typing
 
 from .Network import Network
 
@@ -47,7 +48,7 @@ class ToolHandler(object):
     def __len__(self):
         return len(self._tools)
 
-    def get(self, name: str | int = None):
+    def get(self, name: typing.Union[str, int] = None):
         """Return named temperature or first one.
 
         Args:

@@ -3,6 +3,7 @@ import logging
 
 from ffpp.Printer import Printer
 
+# Activate module logger to output.
 LOG = logging.getLogger("ffpp")
 LOG.setLevel(logging.DEBUG)
 out_handler = logging.StreamHandler()
@@ -58,6 +59,8 @@ async def update_and_print(myPrinter: Printer):
     # Print some information about printer and temperature.
     print("==================================================")
     print(f"{myPrinter.machine_type} is {myPrinter.machine_status}")
+    print(
+        f"Printer name {myPrinter.machine_name} is now {myPrinter.move_mode}")
     print(f"Status {myPrinter.status} print percent {myPrinter.print_percent}")
     print(f"Extruder {extruder.name} is now {extruder.now}")
     print(f"Bed {bed.name} is now {bed.now}")

@@ -12,6 +12,7 @@ class Network(object):
         self.responseData: list[bytes] | None = None
 
     async def connect(self):
+        error = False
         connection = asyncio.open_connection(
             self.ip,
             self.port,
@@ -21,9 +22,12 @@ class Network(object):
                 connection,
                 timeout=3
             )
-        except TimeoutError:  # asyncio.TimeoutError:
+        except Exception:  # CancelError and TimeoutError
             LOG.debug("Unable to connect")
-            raise
+            error = True
+
+        if error:
+            raise TimeoutError
         return True
 
     async def sendMessage(self, messages: list[bytes], decode=True):

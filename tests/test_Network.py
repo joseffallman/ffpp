@@ -225,4 +225,5 @@ class TestNetworkCommunicateWithPrinter(unittest.IsolatedAsyncioTestCase):
         response = net.responseData
 
         # Assert
+        self.assertTrue(success)
         self.assertIsNotNone(response, "responseData is None")

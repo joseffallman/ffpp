@@ -193,7 +193,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(bed.now == 14)
         self.assertTrue(bed.target == 0)
 
-    async def test_toolHandlerAdd_CorrectCount(self):
+    async def test_toolHandlerAddsameName_CorrectCount(self):
         # Arrange
         from src.ffpp.Printer import ToolHandler, temperatures
         th = ToolHandler()
@@ -201,6 +201,19 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
         # Act
         th.add(temperatures("extruder", "5", "210"))
         th.add(temperatures("extruder", "15", "210"))
+
+        # Assert
+        self.assertTrue(
+            len(th) == 1, f"Toolhandler is only {len(th)}, expected 1")
+
+    async def test_toolHandlerAdd_CorrectCount(self):
+        # Arrange
+        from src.ffpp.Printer import ToolHandler, temperatures
+        th = ToolHandler()
+
+        # Act
+        th.add(temperatures("extruder", "5", "210"))
+        th.add(temperatures("extruder2", "15", "210"))
 
         # Assert
         self.assertTrue(

@@ -27,17 +27,28 @@ class Network(object):
             error = True
 
         if error:
+            self.connection = None
             raise TimeoutError
         return True
 
-    async def sendMessage(self, messages: list[bytes], decode=True):
+    async def dissconnect(self):
+        try:
+            self._writer.close()
+        except Exception:
+            pass
+        self.connection = None
+        return True
+
+    async def sendMessage(self, messages: list[str], dissconnect=True):
         self.responseData = []
         error = False
 
         if type(messages) is not list:
             messages = [messages]
 
-        await self.connect()
+        if self.connection is None:
+            await self.connect()
+            dissconnect = True
 
         # Send all messages.
         try:
@@ -48,19 +59,22 @@ class Network(object):
                 data = await self._reader.read(1024)
                 if data:
                     self.responseData.append(data)
-            self._writer.close()
         except Exception:
             LOG.debug("Unable to send.")
             error = True
 
         if error:
+            self.dissconnect()
             raise ConnectionError
+
+        if dissconnect:
+            self.dissconnect()
 
         if self.responseData and len(self.responseData) > 0:
             return True
         return False
 
-    async def sendControlRequest(self):
+    async def sendControlRequest(self, dissconnect=True):
         """Send Control message to printer.
 
         Response from printer is something like
@@ -71,7 +85,7 @@ class Network(object):
         Returns:
             [string]: Return response from printer.
         """
-        await self.sendMessage(self._getControlRequestMessage)
+        await self.sendMessage(self._getControlRequestMessage, dissconnect)
 
         if self.responseData and len(self.responseData) > 0:
             return self.responseData[0].decode('utf8', 'ignore')
@@ -81,7 +95,7 @@ class Network(object):
     def _getControlRequestMessage(self):
         return '~M601 S1\r\n'
 
-    async def sendControlRelease(self):
+    async def sendControlRelease(self, dissconnect=True):
         """ Release control of printer. You will only
         be able to watch printer status when you dont have
         the control.
@@ -89,7 +103,7 @@ class Network(object):
         Returns:
             [string]: Return response from printer.
         """
-        await self.sendMessage(self._getControlReleaseMessage)
+        await self.sendMessage(self._getControlReleaseMessage, dissconnect)
 
         if self.responseData and len(self.responseData) > 0:
             return self.responseData[0].decode('utf8', 'ignore')
@@ -99,7 +113,7 @@ class Network(object):
     def _getControlReleaseMessage(self):
         return '~M602\r\n'
 
-    async def sendInfoRequest(self):
+    async def sendInfoRequest(self, dissconnect=True):
         """ Send a request for basic information about printer
 
         Response from printer is something like:
@@ -116,13 +130,13 @@ class Network(object):
         Returns:
             [string]: Return response from printer.
         """
-        await self.sendMessage('~M115\r\n')
+        await self.sendMessage('~M115\r\n', dissconnect)
 
         if self.responseData and len(self.responseData) > 0:
             return self.responseData[0].decode('utf8', 'ignore')
         return ""
 
-    async def sendProgressRequest(self):
+    async def sendProgressRequest(self, dissconnect=True):
         """ Request progress data. Response will contain work progress.
 
         Response from printer:
@@ -131,13 +145,13 @@ class Network(object):
         Returns:
             [string]: Return response from printer.
         """
-        await self.sendMessage('~M27\r\n')
+        await self.sendMessage('~M27\r\n', dissconnect)
 
         if self.responseData and len(self.responseData) > 0:
             return self.responseData[0].decode('utf8', 'ignore')
         return ""
 
-    async def sendTempRequest(self):
+    async def sendTempRequest(self, dissconnect=True):
         """ Request temperature data.
 
         Response from printer:
@@ -146,13 +160,13 @@ class Network(object):
         Returns:
             [string]: Return response from printer.
         """
-        await self.sendMessage('~M105\r\n')
+        await self.sendMessage('~M105\r\n', dissconnect)
 
         if self.responseData and len(self.responseData) > 0:
             return self.responseData[0].decode('utf8', 'ignore')
         return ""
 
-    async def sendPositionRequest(self):
+    async def sendPositionRequest(self, dissconnect=True):
         """ Request position data.
 
         Response from printer:
@@ -161,13 +175,13 @@ class Network(object):
         Returns:
             [string]: Return response from printer.
         """
-        await self.sendMessage('~M114\r\n')
+        await self.sendMessage('~M114\r\n', dissconnect)
 
         if self.responseData and len(self.responseData) > 0:
             return self.responseData[0].decode('utf8', 'ignore')
         return ""
 
-    async def sendStatusRequest(self):
+    async def sendStatusRequest(self, dissconnect=True):
         """ Get current status from printer.
 
         Response from printer:
@@ -183,13 +197,13 @@ class Network(object):
         Returns:
             [string]: Return response from printer.
         """
-        await self.sendMessage('~M119\r\n')
+        await self.sendMessage('~M119\r\n', dissconnect)
 
         if self.responseData and len(self.responseData) > 0:
             return self.responseData[0].decode('utf8', 'ignore')
         return ""
 
-    async def sendSetTemperature(self, temp):
+    async def sendSetTemperature(self, temp, dissconnect=True):
         """[summary]
 
         Args:
@@ -203,13 +217,13 @@ class Network(object):
             f'~M104 S{temp} T0',
             self._getControlReleaseMessage,
         ]
-        await self.sendMessage(messages)
+        await self.sendMessage(messages, dissconnect)
 
         if len(self.responseData) > 1:
             return self.responseData[1].decode('utf8', 'ignore')
         return ""
 
-    async def sendSetLedState(self, state):
+    async def sendSetLedState(self, state, dissconnect=True):
         """ Turn led on or off
 
         Args:
@@ -223,13 +237,13 @@ class Network(object):
             f'~M146 r{state} g{state} b{state} F0\r\n',
             self._getControlReleaseMessage,
         ]
-        await self.sendMessage(messages)
+        await self.sendMessage(messages, dissconnect)
 
         if len(self.responseData) > 1:
             return self.responseData[1].decode('utf8', 'ignore')
         return ""
 
-    async def sendGetFileNames(self):
+    async def sendGetFileNames(self, dissconnect=True):
         """ Get the filenames stored on the printer.
         Response will be left decoded in the responseData variable.
 
@@ -237,7 +251,7 @@ class Network(object):
             [list]: Filenames as string
         """
         # Don't decode this strait away.
-        await self.sendMessage('~M661\r\n', False)
+        await self.sendMessage('~M661\r\n', dissconnect)
 
         if self.responseData and len(self.responseData) > 0:
             response = self.responseData[0]
@@ -262,7 +276,7 @@ class Network(object):
         """
         return f"http://{self.ip}:8080/?action=stream"
 
-    async def sendPauseRequest(self):
+    async def sendPauseRequest(self, dissconnect=True):
         """ Pause current print.
 
         Response from printer:
@@ -276,13 +290,13 @@ class Network(object):
             '~M25\r\n',
             self._getControlReleaseMessage,
         ]
-        await self.sendMessage(messages)
+        await self.sendMessage(messages, dissconnect)
 
         if len(self.responseData) > 1:
             return self.responseData[1].decode('utf8', 'ignore')
         return ""
 
-    async def sendContinueRequest(self):
+    async def sendContinueRequest(self, dissconnect=True):
         """ Continue current print.
 
         Response from printer:
@@ -296,13 +310,13 @@ class Network(object):
             '~M24\r\n',
             self._getControlReleaseMessage,
         ]
-        await self.sendMessage(messages)
+        await self.sendMessage(messages, dissconnect)
 
         if len(self.responseData) > 1:
             return self.responseData[1].decode('utf8', 'ignore')
         return ""
 
-    async def sendPrintRequest(self, file):
+    async def sendPrintRequest(self, file, dissconnect=True):
         """ Print file print.
 
         Example command to send:
@@ -324,13 +338,13 @@ class Network(object):
             f'~M23 0:/user/{file}\r\n',
             self._getControlReleaseMessage,
         ]
-        await self.sendMessage(messages)
+        await self.sendMessage(messages, dissconnect)
 
         if len(self.responseData) > 1:
             return self.responseData[1].decode('utf8', 'ignore')
         return ""
 
-    async def sendAbortRequest(self):
+    async def sendAbortRequest(self, dissconnect=True):
         """ Abort file print.
 
         Response from printer:
@@ -344,7 +358,7 @@ class Network(object):
             '~M26\r\n',
             self._getControlReleaseMessage,
         ]
-        await self.sendMessage(messages)
+        await self.sendMessage(messages, dissconnect)
 
         if len(self.responseData) > 1:
             return self.responseData[1].decode('utf8', 'ignore')

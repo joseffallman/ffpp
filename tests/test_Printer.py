@@ -218,6 +218,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
         # Act
         ret_extruder1 = th.get()  # Return first
         ret_extruder2 = th.get("Extruder2")  # Return extruder2
+        ret_extruder3 = th.get(1)  # Return extruder2
         ret_extruder85 = th.get("Extruder85")  # Return None
 
         # Assert
@@ -225,6 +226,8 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
             ret_extruder1 == extruder1, "Toolhandler did'nt return first extruder.")
         self.assertTrue(
             ret_extruder2 == extruder2, "Toolhandler did'nt return specific extruder.")
+        self.assertTrue(
+            ret_extruder3 == extruder2, "Toolhandler did'nt return correct index.")
         self.assertIsNone(ret_extruder85)
 
     async def test_toolHandlerDelete_deleteCorrect(self):

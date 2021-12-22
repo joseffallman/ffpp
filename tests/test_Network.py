@@ -44,18 +44,20 @@ class TestNetworkClass(unittest.IsolatedAsyncioTestCase):
         )
 
     # @mock.patch('src.ffpp.Network.asyncio', new=mock.AsyncMock)
-    async def test_printerSendFailFirst_UnableToReconnectAndResend(self):  # noqa
+    async def test_sendMessageUnconnectedConnectionTimeout_exceptionTimeoutError(self):  # noqa
         # Arrange
-        net = Network(PRINTER_IP)
+        net = Network("")
         self.mockReturnValue(["Hej", "Två"])
+        self.mock_con.wait_for.side_effect = TimeoutError
 
         # Act
-        response = await net.sendMessage(["msg1", "msg2"])
+        with self.assertRaises(TimeoutError):
+            await net.sendMessage("msg_to_send")
 
         # Assert
         # No exception occurred, test responseData
         # self.assertEqual(mock_socket.socket().connect.call_count, 2)
-        self.assertFalse(response)
+        # self.assertFalse(response)
 
 
 class TestNetworkCommunicateWithPrinter(unittest.IsolatedAsyncioTestCase):

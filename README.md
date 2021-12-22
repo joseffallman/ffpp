@@ -6,25 +6,24 @@ Tested on FlashForge Adventure 4, most likly to be working with other FlashForge
 
 # How to use
 ```
-import ffpp
-myPrinter = ffpp.Printer(192.168.0.1, 8899) # Change to the ip of your printer.
+from ffpp.Printer import Printer
+myPrinter = Printer('192.168.0.1', 8899) # Change to the ip of your printer.
 myPrinter.connect()
 
-print(f"{myPrinter.machine_status} is {myPrinter.machine_status.value}")
+print(f"{myPrinter.machine_type} is {myPrinter.machine_status}")
 ```
 
 # Important note
 You need to call the `update()` to get the current status, temperature and print percent from printer.
 ```
 myPrinter.update()
-print(myPrinter.extruder_temp.value)
+print(myPrinter.print_percent)
 myPrinter.update()
-print(myPrinter.extruder_temp.value)
+print(myPrinter.print_percent)
 ```
 
 # Information from 3D printer
 This is the information collected from the printer.
-You'll find the value in the 'value' attribute of each field.
 - myPrinter.machine_type
 - myPrinter.machine_name
 - myPrinter.firmware
@@ -39,8 +38,19 @@ You'll find the value in the 'value' attribute of each field.
 - myPrinter.status
 - myPrinter.led
 - myPrinter.current_file
-- myPrinter.extruder_temp
-- myPrinter.extruder_target_temp
-- myPrinter.bed_temp
-- myPrinter.bed_target_temp
 - myPrinter.print_percent
+
+## To get some temperature you need to get right tool. 
+Run this line to return the extruder tool:
+```
+extruder = myPrinter.extruder_tools.get()
+# or by index
+extruder2 = myPrinter.extruder_tools.get(1)
+```
+You can do the same for your bed in myPrinter.bed_tools
+
+Then you can do:
+```
+extruder.now # Current temperature.
+extruder.target # Target temperature.
+```

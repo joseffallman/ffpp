@@ -47,11 +47,11 @@ class ToolHandler(object):
     def __len__(self):
         return len(self._tools)
 
-    def get(self, name: str = None):
+    def get(self, name: str | int = None):
         """Return named temperature or first one.
 
         Args:
-            name (str, optional): Named temperature. Defaults to None.
+            name (str | int, optional): Named temperature. Defaults to None.
 
         Returns:
             [temperatures]: Temperature object
@@ -61,6 +61,9 @@ class ToolHandler(object):
 
         if not name:
             return list(self._tools.values())[0]
+
+        if type(name) is int:
+            return list(self._tools.values())[name]
 
         try:
             return self._tools[name.lower()]
@@ -132,8 +135,8 @@ class Printer(object):
             if connected:
                 self.connected = ConnectionStatus.CONNECTED
 
-                await self.updateMachineInfo()
-                await self.update()
+                await self.updateMachineInfo(dissconnect=False)
+                await self.update(dissconnect=True)
 
         return True
 
@@ -197,12 +200,12 @@ class Printer(object):
     def print_percent(self):
         return self._print_percent.value
 
-    async def updateMachineInfo(self):
+    async def updateMachineInfo(self, dissconnect=True):
         if not self.connected:
             LOG.info("Machine is not connected")
             await self.connect()
 
-        response = await self.network.sendInfoRequest()
+        response = await self.network.sendInfoRequest(dissconnect=False)
         if not response:
             return
 
@@ -223,7 +226,10 @@ class Printer(object):
             if re_result:
                 field.value = re_result.group(1)
 
-    async def update(self):
+        if dissconnect:
+            await self.network.dissconnect()
+
+    async def update(self, dissconnect=True):
         if not self.connected:
             LOG.info("Machine is not connected")
             await self.connect()
@@ -239,7 +245,7 @@ class Printer(object):
         CurrentFile: \r\n
         ok\r\n'
         """
-        response = await self.network.sendStatusRequest()
+        response = await self.network.sendStatusRequest(dissconnect=False)
         if not response:
             return
 
@@ -260,7 +266,7 @@ class Printer(object):
         """
         'CMD M105 Received.\r\nT0:22/0 B:14/0\r\nok\r\n'
         """
-        response = await self.network.sendTempRequest()
+        response = await self.network.sendTempRequest(dissconnect=False)
         if not response:
             return
 
@@ -286,10 +292,13 @@ class Printer(object):
         """
         'CMD M27 Received.\r\nSD printing byte 0/100\r\nok\r\n'
         """
-        response = await self.network.sendProgressRequest()
+        response = await self.network.sendProgressRequest(dissconnect=False)
         if not response:
             return
 
         re_result = self._print_percent.regex.search(response)
         if re_result:
             self._print_percent.value = re_result.group(1)
+
+        if dissconnect:
+            await self.network.dissconnect()

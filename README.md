@@ -1,28 +1,30 @@
-FlashForge 3D Printer Protocol
+# FlashForge 3D Printer Protocol
 
+Async python protocol for flashforge printers.
 A simple way to connect and interact with your 3D printer.
 
 Tested on FlashForge Adventure 4, most likly to be working with other FlashForge printers.
 
-# How to use
+## How to use
 ```
 from ffpp.Printer import Printer
 myPrinter = Printer('192.168.0.1', 8899) # Change to the ip of your printer.
-myPrinter.connect()
+await myPrinter.connect()
 
 print(f"{myPrinter.machine_type} is {myPrinter.machine_status}")
 ```
+Check out example to learn more.
 
-# Important note
+## Important note
 You need to call the `update()` to get the current status, temperature and print percent from printer.
 ```
-myPrinter.update()
+await myPrinter.update()
 print(myPrinter.print_percent)
-myPrinter.update()
+await myPrinter.update()
 print(myPrinter.print_percent)
 ```
 
-# Information from 3D printer
+## Information from 3D printer
 This is the information collected from the printer.
 - myPrinter.machine_type
 - myPrinter.machine_name

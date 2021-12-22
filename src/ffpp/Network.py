@@ -40,7 +40,7 @@ class Network(object):
         self.connection = None
         return True
 
-    async def sendMessage(self, messages: list[str], dissconnect=True):
+    async def sendMessage(self, messages: typing.List[str], dissconnect=True):
         self.responseData = []
         error = False
 

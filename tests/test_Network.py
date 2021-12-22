@@ -214,3 +214,15 @@ class TestNetworkCommunicateWithPrinter(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(response, "responseData is None")
         self.assertTrue("CMD M26 Received" in response,
                         "Wrong message from printer.")
+
+    @unittest.skip("Only run this test manually")
+    async def test_testNewCommand_expectedResult(self):
+        # Arrange
+        net = Network(PRINTER_IP)
+
+        # Act
+        success = await net.sendMessage('~M129\r\n')
+        response = net.responseData
+
+        # Assert
+        self.assertIsNotNone(response, "responseData is None")

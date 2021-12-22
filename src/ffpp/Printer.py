@@ -115,7 +115,7 @@ class Printer(object):
         self._bed_temp = field(
             "Bed Temp", None, "(B)\s?:\s?(\d+)/(\d*)")  # noqa
         self._print_percent = field(
-            "Print Percent", None, "byte\s?(\d)/\d+")  # noqa
+            "Print Percent", None, "byte\s?(\d+)/\d+")  # noqa
 
         self.extruder_tools = ToolHandler()
 

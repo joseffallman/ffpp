@@ -28,7 +28,7 @@ class TestNetworkClass(unittest.IsolatedAsyncioTestCase):
 
     def mockReturnValue(
         self,
-        returnMessage: typing.Union[list[str], str] = []
+        returnMessage: typing.Union[typing.List[str], str] = []
     ):
         # Mock socket connection.
         reader = mock.AsyncMock()

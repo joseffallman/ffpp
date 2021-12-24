@@ -43,7 +43,7 @@ class ToolHandler(object):
         pass
 
     def __iter__(self):
-        return iter(self._tools)
+        return iter(self._tools.values())
 
     def __len__(self):
         return len(self._tools)

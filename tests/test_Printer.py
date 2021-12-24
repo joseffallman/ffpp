@@ -274,3 +274,23 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
             f"Toolhandler is only {len(th)}, expected 2"
         )
         self.assertIsNone(ret_extruder85)
+
+    async def test_toolHandlerIter_CorrectIter(self):
+        # Arrange
+        from src.ffpp.Printer import ToolHandler, temperatures
+        th = ToolHandler()
+        extruder1 = temperatures("exTruder1", "5", "210")
+        extruder2 = temperatures("exTruder2", "15", "210")
+        assert_obj = [extruder1, extruder2]
+        temp_obj = []
+
+        # Act
+        th.add(extruder1)
+        th.add(extruder2)
+        for t in th:
+            temp_obj.append(t)
+
+        # Assert
+        self.assertTrue(
+            len(temp_obj) == 2, f"Toolhandler is only {len(th)}, expected 2")
+        self.assertListEqual(temp_obj, assert_obj)

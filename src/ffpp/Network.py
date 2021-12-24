@@ -13,23 +13,20 @@ class Network(object):
         self.responseData: typing.Union[list[bytes], None] = None
 
     async def connect(self):
-        error = False
-        connection = asyncio.open_connection(
+        self.connection = asyncio.open_connection(
             self.ip,
             self.port,
         )
         try:
             self._reader, self._writer = await asyncio.wait_for(
-                connection,
+                self.connection,
                 timeout=3
             )
-        except Exception:  # CancelError and TimeoutError
+        except Exception as e:  # CancelError and TimeoutError
             LOG.debug("Unable to connect")
-            error = True
-
-        if error:
             self.connection = None
-            raise TimeoutError
+            raise TimeoutError(e) from e
+
         return True
 
     async def dissconnect(self):
@@ -42,14 +39,12 @@ class Network(object):
 
     async def sendMessage(self, messages: typing.List[str], dissconnect=True):
         self.responseData = []
-        error = False
 
         if type(messages) is not list:
             messages = [messages]
 
         if self.connection is None:
             await self.connect()
-            dissconnect = True
 
         # Send all messages.
         try:
@@ -60,16 +55,13 @@ class Network(object):
                 data = await self._reader.read(1024)
                 if data:
                     self.responseData.append(data)
-        except Exception:
+        except Exception as e:
             LOG.debug("Unable to send.")
-            error = True
-
-        if error:
-            self.dissconnect()
-            raise ConnectionError
+            await self.dissconnect()
+            raise ConnectionError(e) from e
 
         if dissconnect:
-            self.dissconnect()
+            await self.dissconnect()
 
         if self.responseData and len(self.responseData) > 0:
             return True

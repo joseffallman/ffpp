@@ -1,13 +1,11 @@
+'''FlashForge Printer Protocol
+    a async python module to
+    connect to a local
+    flashforge printer.
+'''
 import logging
 
-# from .Printer
 from . import Printer  # noqa
+from . import Discovery  # noqa
 
 LOG = logging.getLogger(__name__)
-# LOG.setLevel(logging.DEBUG)
-# out_handler = logging.StreamHandler()
-# formatter = logging.Formatter(
-#     '%(asctime)s : %(levelname)s : %(name)s : %(message)s'
-# )
-# out_handler.setFormatter(formatter)
-# LOG.addHandler(out_handler)

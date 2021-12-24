@@ -1,7 +1,10 @@
 import asyncio
 import logging
 
+
 from ffpp.Printer import Printer
+from ffpp.Discovery import getPrinters
+
 
 # Activate module logger to output.
 LOG = logging.getLogger("ffpp")
@@ -22,8 +25,16 @@ async def main():
     print("FlashForge Printer Protocol demo.")
     print("press ctrl+c to exit.")
     print("")
-    print("Enter your printer ip:")
-    ip = input()
+    ip = None
+    loop = asyncio.get_running_loop()
+    printers = await getPrinters(loop, limit=1)
+    for name, host in printers:
+        ip = host
+        break
+
+    if ip is None:
+        print("Enter your printer ip:")
+        ip = input()
     myPrinter = Printer(ip)
     try:
         await myPrinter.connect()

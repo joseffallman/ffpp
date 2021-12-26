@@ -29,6 +29,9 @@ RESPONSE_sendInfoRequest = (
 RESPONSE_sendProgressRequest = (
     'CMD M27 Received.\r\nSD printing byte 0/100\r\nok\r\n'
 )
+RESPONSE_sendProgressRequest2 = (
+    'CMD M27 Received.\r\nSD printing byte 11/100\r\nLayer: 44/419\r\nok\r\n'
+)
 
 # TempRequest
 RESPONSE_sendTempRequest = (
@@ -51,6 +54,17 @@ RESPONSE_sendStatusRequest = (
     'Status: S:1 L:0 J:0 F:0\r\n'
     'LED: 0\r\n'
     'CurrentFile: \r\n'
+    'ok\r\n'
+)
+
+RESPONSE_sendStatusRequest2 = (
+    'CMD M119 Received.\r\n'
+    'Endstop: X-max:0 Y-max:0 Z-max:0\r\n'
+    'MachineStatus: BUILDING_FROM_SD\r\n'
+    'MoveMode: MOVING\r\n'
+    'Status: S:1 L:0 J:0 F:0\r\n'
+    'LED: 1\r\n'
+    'CurrentFile: RussianDollMazeModels.gx\r\n'
     'ok\r\n'
 )
 

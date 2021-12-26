@@ -14,8 +14,10 @@ from tests.const_NetworkResponse import (
     RESPONSE_sendPositionRequest,
     RESPONSE_sendPrintRequest,
     RESPONSE_sendProgressRequest,
+    RESPONSE_sendProgressRequest2,
     RESPONSE_sendSetTemperature,
     RESPONSE_sendStatusRequest,
+    RESPONSE_sendStatusRequest2,
     RESPONSE_sendTempRequest,
     RESPONSE_sendsetLedState
 )
@@ -161,21 +163,65 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
 
     async def test_getExtendedInfoAtConnect_getExtendedInfo(self):
         # Arrage
+        self.mock_net().sendStatusRequest. \
+            return_value = RESPONSE_sendStatusRequest
+        self.mock_net().sendProgressRequest. \
+            return_value = RESPONSE_sendProgressRequest
 
         # Act
         await self.printer.connect()
-        dataField = [
-            self.printer.machine_status,
-            self.printer.move_mode,
-            self.printer.status,
-            self.printer.led,
-            self.printer.current_file,
-            self.printer.print_percent,
-        ]
 
         # Assert
-        for data in dataField:
-            self.assertIsNotNone(data, f"{data} is {data}")
+        self.assertEqual(self.printer.machine_status, "READY")
+        self.assertEqual(self.printer.move_mode, "READY")
+        self.assertEqual(self.printer.status, "S:1 L:0 J:0 F:0")
+        self.assertEqual(self.printer.led, "0")
+        self.assertEqual(self.printer.job_file, "")
+        self.assertEqual(self.printer.print_percent, "0")
+
+    async def test_getUpdateProgress_getCorrectInfo(self):
+        # Arrage
+        self.mock_net().sendStatusRequest. \
+            return_value = RESPONSE_sendStatusRequest2
+        self.mock_net().sendProgressRequest. \
+            return_value = RESPONSE_sendProgressRequest2
+
+        # Act
+        await self.printer.connect()
+
+        # Assert
+        self.assertEqual(
+            self.printer.machine_status,
+            "BUILDING_FROM_SD", "Machine status gave wrong response"
+        )
+        self.assertEqual(
+            self.printer.move_mode, "MOVING",
+            "Move mode gave wrong response"
+        )
+        self.assertEqual(
+            self.printer.status, "S:1 L:0 J:0 F:0",
+            "Status gave wrong response"
+        )
+        self.assertEqual(
+            self.printer.led, "1",
+            "Led gave wrong response"
+        )
+        self.assertEqual(
+            self.printer.job_file, "RussianDollMazeModels.gx",
+            "Current file gave wrong response"
+        )
+        self.assertEqual(
+            self.printer.print_percent, "11",
+            "Percent gave wrong response"
+        )
+        self.assertEqual(
+            self.printer.print_layer, "44",
+            "Print layer gave wrong response"
+        )
+        self.assertEqual(
+            self.printer.job_layers, "419",
+            "Total layer gave wrong response"
+        )
 
     async def test_getExtrudersAndBedsTemp_getTemp(self):
         # Arrage

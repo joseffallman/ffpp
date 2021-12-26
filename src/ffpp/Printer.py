@@ -109,10 +109,10 @@ class Printer(object):
         self._move_mode = field(
             "Move Mode", None, "MoveMode\s?:\s?(.*?)\\r\\n")  # noqa
         self._status = field(
-            "Status", None, "Status\s?:\s?(.*?)\\r\\n")  # noqa
+            "Status", None, "(?:\\n|\A)Status\s?:\s?(.*?)\\r\\n")  # noqa
         self._led = field(
             "LED", None, "LED\s?:\s?(.*?)\\r\\n")  # noqa
-        self._current_file = field(
+        self._job_file = field(
             "Current File", None, "CurrentFile\s?:\s?(.*?)\\r\\n")  # noqa
         self._extruder_temp = field(
             "Extruder Temp", None, "(T0)\s?:\s?(\d+)/(\d*)")  # noqa
@@ -120,6 +120,10 @@ class Printer(object):
             "Bed Temp", None, "(B)\s?:\s?(\d+)/(\d*)")  # noqa
         self._print_percent = field(
             "Print Percent", None, "byte\s?(\d+)/\d+")  # noqa
+        self._print_layer = field(
+            "Print layer", None, "Layer:\s?(\d+)/(\d+)")  # noqa
+        self._job_layers = field(
+            "Print Total layer", None, "Layer:\s?\d+/(\d+)")  # noqa
 
         self.extruder_tools = ToolHandler()
 
@@ -179,27 +183,40 @@ class Printer(object):
 
     @property
     def machine_status(self):
+        """ READY       BUILDING_FROM_SD """
         return self._machine_status.value
 
     @property
     def move_mode(self):
+        """ READY        MOVING """
         return self._move_mode.value
 
     @property
     def status(self):
+        """ S:1 L:0 J:0 F:0 """
         return self._status.value
 
     @property
     def led(self):
+        """ 0       1 """
         return self._led.value
 
     @property
-    def current_file(self):
-        return self._current_file.value
+    def job_file(self):
+        """ file.gx      """
+        return self._job_file.value
 
     @property
     def print_percent(self):
         return self._print_percent.value
+
+    @property
+    def print_layer(self):
+        return self._print_layer.value
+
+    @property
+    def job_layers(self):
+        return self._job_layers.value
 
     async def updateMachineInfo(self, dissconnect=True):
         if not self.connected:
@@ -255,7 +272,7 @@ class Printer(object):
             self._move_mode,
             self._status,
             self._led,
-            self._current_file
+            self._job_file
         ]
 
         for field in dataField:
@@ -297,9 +314,16 @@ class Printer(object):
         if not response:
             return
 
+        # Print percent.
         re_result = self._print_percent.regex.search(response)
         if re_result:
             self._print_percent.value = re_result.group(1)
+
+        # Print layer and total layer.
+        re_result = self._print_layer.regex.search(response)
+        if re_result:
+            self._print_layer.value = re_result.group(1)
+            self._job_layers.value = re_result.group(2)
 
         if dissconnect:
             await self.network.dissconnect()

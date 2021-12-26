@@ -108,7 +108,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
 
         # Assert
         self.assertTrue(
-            self.printer.connected == ConnectionStatus.DISSCONNECTED,
+            self.printer.connected == ConnectionStatus.DISCONNECTED,
             f"{self.printer.connected}"
         )
 
@@ -122,7 +122,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
 
         # Assert
         self.assertTrue(
-            self.printer.connected == ConnectionStatus.DISSCONNECTED,
+            self.printer.connected == ConnectionStatus.DISCONNECTED,
             f"{self.printer.connected}"
         )
 
@@ -136,7 +136,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
 
         # Assert
         self.assertTrue(
-            self.printer.connected == ConnectionStatus.DISSCONNECTED,
+            self.printer.connected == ConnectionStatus.DISCONNECTED,
             f"{self.printer.connected}"
         )
 

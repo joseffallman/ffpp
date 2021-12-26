@@ -10,7 +10,7 @@ LOG = logging.getLogger(__name__)
 
 
 class ConnectionStatus(IntEnum):
-    DISSCONNECTED = 0
+    DISCONNECTED = 0
     CONNECTED = 1
     CONTROL = 2
 
@@ -82,7 +82,7 @@ class Printer(object):
 
     def __init__(self, ip, port=8899):
         # Instance Variables
-        self.connected: ConnectionStatus = ConnectionStatus.DISSCONNECTED
+        self.connected: ConnectionStatus = ConnectionStatus.DISCONNECTED
         self.network = Network(ip, port)
 
         # Machine info fields
@@ -130,7 +130,7 @@ class Printer(object):
         self.bed_tools = ToolHandler()
 
     async def connect(self):
-        if self.connected is ConnectionStatus.DISSCONNECTED:
+        if self.connected is ConnectionStatus.DISCONNECTED:
             connected = False
             try:
                 connected = await self.network.connect()
@@ -140,8 +140,8 @@ class Printer(object):
             if connected:
                 self.connected = ConnectionStatus.CONNECTED
 
-                await self.updateMachineInfo(dissconnect=False)
-                await self.update(dissconnect=True)
+                await self.updateMachineInfo(disconnect=False)
+                await self.update(disconnect=True)
 
         return True
 
@@ -218,12 +218,12 @@ class Printer(object):
     def job_layers(self):
         return self._job_layers.value
 
-    async def updateMachineInfo(self, dissconnect=True):
+    async def updateMachineInfo(self, disconnect=True):
         if not self.connected:
             LOG.info("Machine is not connected")
             await self.connect()
 
-        response = await self.network.sendInfoRequest(dissconnect=False)
+        response = await self.network.sendInfoRequest(disconnect=False)
         if not response:
             return
 
@@ -244,10 +244,10 @@ class Printer(object):
             if re_result:
                 field.value = re_result.group(1)
 
-        if dissconnect:
-            await self.network.dissconnect()
+        if disconnect:
+            await self.network.disconnect()
 
-    async def update(self, dissconnect=True):
+    async def update(self, disconnect=True):
         if not self.connected:
             LOG.info("Machine is not connected")
             await self.connect()
@@ -263,7 +263,7 @@ class Printer(object):
         CurrentFile: \r\n
         ok\r\n'
         """
-        response = await self.network.sendStatusRequest(dissconnect=False)
+        response = await self.network.sendStatusRequest(disconnect=False)
         if not response:
             return
 
@@ -284,7 +284,7 @@ class Printer(object):
         """
         'CMD M105 Received.\r\nT0:22/0 B:14/0\r\nok\r\n'
         """
-        response = await self.network.sendTempRequest(dissconnect=False)
+        response = await self.network.sendTempRequest(disconnect=False)
         if not response:
             return
 
@@ -310,7 +310,7 @@ class Printer(object):
         """
         'CMD M27 Received.\r\nSD printing byte 0/100\r\nok\r\n'
         """
-        response = await self.network.sendProgressRequest(dissconnect=False)
+        response = await self.network.sendProgressRequest(disconnect=False)
         if not response:
             return
 
@@ -325,5 +325,5 @@ class Printer(object):
             self._print_layer.value = re_result.group(1)
             self._job_layers.value = re_result.group(2)
 
-        if dissconnect:
-            await self.network.dissconnect()
+        if disconnect:
+            await self.network.disconnect()

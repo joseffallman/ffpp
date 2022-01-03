@@ -45,7 +45,6 @@ class ffDiscoveryDatagramProtocol(asyncio.DatagramProtocol):
         except Exception:
             return
 
-        # print("Received:", name, ip)
         self.data.append((name, ip))
 
         if self.received == self.limit:
@@ -56,7 +55,6 @@ class ffDiscoveryDatagramProtocol(asyncio.DatagramProtocol):
         # print('Error received:', exc)
 
     def connection_lost(self, exc):
-        # print("Connection closed")
         self.on_con_lost.set_result(True)
 
 
@@ -91,12 +89,12 @@ async def getPrinters(loop: asyncio.BaseEventLoop, limit: int = None, host_ip: s
     message = "Hello World!"
 
     if not host_ip:
-        ip = find_host_ip()
+        host_ip = find_host_ip()
 
     transport, ffDiscovery = await loop.create_datagram_endpoint(
         lambda: ffDiscoveryDatagramProtocol(
-            message, on_con_lost, ip, limit),
-        local_addr=(ip, 8002)
+            message, on_con_lost, host_ip, limit),
+        local_addr=(host_ip, 8002)
     )
     try:
         # Wait until limit or timeout is reached.
@@ -112,6 +110,6 @@ async def getPrinters(loop: asyncio.BaseEventLoop, limit: int = None, host_ip: s
 
     printers = ffDiscovery.data
     for printer in printers:
-        print(printer)
+        LOG.debug("Printer online: %s - %s", printer[0], printer[1])
 
     return printers

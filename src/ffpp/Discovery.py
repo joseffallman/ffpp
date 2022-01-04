@@ -55,7 +55,10 @@ class ffDiscoveryDatagramProtocol(asyncio.DatagramProtocol):
         # print('Error received:', exc)
 
     def connection_lost(self, exc):
-        self.on_con_lost.set_result(True)
+        try:
+            self.on_con_lost.set_result(True)
+        except asyncio.exceptions.InvalidStateError:
+            pass
 
 
 def find_host_ip():

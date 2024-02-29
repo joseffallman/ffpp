@@ -115,9 +115,9 @@ class Printer(object):
         self._job_file = field(
             "Current File", None, "CurrentFile\s?:\s?(.*?)\\r\\n")  # noqa
         self._extruder_temp = field(
-            "Extruder Temp", None, "(T0)\s?:\s?(\d+)/(\d*)")  # noqa
+           "Extruder Temp", None, "(T0)\s?:\s?(\d*.)?\d+$/(\d*.)?\d+$")  # noqa
         self._bed_temp = field(
-            "Bed Temp", None, "(B)\s?:\s?(\d+)/(\d*)")  # noqa
+            "Bed Temp", None, "(B)\s?:\s?(\d*.)?\d+$/(\d*.)?\d+$")  # noqa
         self._print_percent = field(
             "Print Percent", None, "byte\s?(\d+)/\d+")  # noqa
         self._print_layer = field(

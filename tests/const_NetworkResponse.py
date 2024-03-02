@@ -38,6 +38,11 @@ RESPONSE_sendTempRequest = (
     'CMD M105 Received.\r\nT0:22/0 B:14/0\r\nok\r\n'
 )
 
+# TempRequest2
+RESPONSE_sendTempRequest2 = (
+    'CMD M105 Received.\r\nT0:104.5/225.0 T1:0.0/0.0 B:51.3/50.0\r\nok\r\n'
+)
+
 # PositionRequest
 RESPONSE_sendPositionRequest = (
     'CMD M114 Received.\r\n'

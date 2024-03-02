@@ -19,6 +19,7 @@ from tests.const_NetworkResponse import (
     RESPONSE_sendStatusRequest,
     RESPONSE_sendStatusRequest2,
     RESPONSE_sendTempRequest,
+    RESPONSE_sendTempRequest2,
     RESPONSE_sendsetLedState
 )
 
@@ -222,6 +223,24 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
             self.printer.job_layers, "419",
             "Total layer gave wrong response"
         )
+
+    async def test_getExtrudersAndBedsTempAM5_getTemp(self):
+        # Arrage
+        self.mock_net().sendTempRequest. \
+            return_value = RESPONSE_sendTempRequest2
+
+        # Act
+        await self.printer.update()
+        extruder = self.printer.extruder_tools.get()
+        bed = self.printer.bed_tools.get()
+
+        # Assert
+        self.assertTrue(len(self.printer.extruder_tools) == 1)
+        self.assertTrue(extruder.now == 104.5)
+        self.assertTrue(extruder.target == 225.0)
+        self.assertTrue(len(self.printer.bed_tools) == 1)
+        self.assertTrue(bed.now == 51.3)
+        self.assertTrue(bed.target == 50.0)
 
     async def test_getExtrudersAndBedsTemp_getTemp(self):
         # Arrage

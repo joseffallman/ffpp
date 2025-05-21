@@ -204,7 +204,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
             "Status gave wrong response"
         )
         self.assertEqual(
-            self.printer.led, "1",
+            self.printer.led, True,
             "Led gave wrong response"
         )
         self.assertEqual(

@@ -6,7 +6,7 @@ import asyncio
 
 from src.ffpp.Network import Network
 
-PRINTER_IP = "192.168.50.64"
+PRINTER_IP = "192.168.20.41"
 PRINTER_PORT = 8899
 
 
@@ -167,7 +167,7 @@ class TestNetworkCommunicateWithPrinter(unittest.IsolatedAsyncioTestCase):
     async def test_setTemperature_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
-        net.sendControlRequest()
+        await net.sendControlRequest()
 
         # Act
         response = await net.sendSetTemperature(40)
@@ -219,13 +219,14 @@ class TestNetworkCommunicateWithPrinter(unittest.IsolatedAsyncioTestCase):
         self.assertTrue("CMD M26 Received" in response,
                         "Wrong message from printer.")
 
-    @unittest.skip("Only run this test manually")
+    # @unittest.skip("Only run this test manually")
     async def test_testNewCommand_expectedResult(self):
         # Arrange
         net = Network(PRINTER_IP)
 
         # Act
-        success = await net.sendMessage('~M129\r\n')
+        #success = await net.sendMessage('~M129\r\n')
+        success = await net.sendSetLedState(0)
         response = net.responseData
 
         # Assert

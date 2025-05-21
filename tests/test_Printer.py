@@ -176,7 +176,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.printer.machine_status, "READY")
         self.assertEqual(self.printer.move_mode, "READY")
         self.assertEqual(self.printer.status, "S:1 L:0 J:0 F:0")
-        self.assertEqual(self.printer.led, "0")
+        self.assertEqual(self.printer.led, False)
         self.assertEqual(self.printer.job_file, "")
         self.assertEqual(self.printer.print_percent, "0")
 
@@ -359,3 +359,20 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             len(temp_obj) == 2, f"Toolhandler is only {len(th)}, expected 2")
         self.assertListEqual(temp_obj, assert_obj)
+
+    async def test_SetPrinterLedState_CorrectResponse(self):
+        # Arrange
+        self.mock_net().sendSetLedState. \
+            return_value = RESPONSE_sendsetLedState
+
+        async def runner(self, state):
+        # Act
+            await self.printer.setLed(state)
+
+            # Assert
+            self.assertTrue(
+                self.printer.led == state,
+                f"Printer led state is {self.printer.led}, expected {state}"
+            )
+        await runner(self, True)
+        await runner(self, False)

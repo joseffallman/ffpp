@@ -1,4 +1,3 @@
-
 from enum import IntEnum
 import logging
 import re
@@ -87,43 +86,43 @@ class Printer(object):
 
         # Machine info fields
         self._machine_type = field(
-            "Machine Type", None, "Machine Type\s?:\s?(.*?)\\r\\n")  # noqa
+            "Machine Type", None, "Machine Type\s?:\s?(.*?)\r\n")
         self._machine_name = field(
-            "Machine Name", None, "Machine Name\s?:\s?(.*?)\\r\\n")  # noqa
+            "Machine Name", None, r"Machine Name\s?:\s?(.*?)\r\n")
         self._firmware = field(
-            "Firmware", None, "Firmware\s?:\s?(.*?)\\r\\n")  # noqa
+            "Firmware", None, r"Firmware\s?:\s?(.*?)\r\n")
         self._machine_SN = field(
-            "Machine SN", None, "SN\s?:\s?(.*?)\\r\\n")  # noqa
+            "Machine SN", None, r"SN\s?:\s?(.*?)\r\n")
         self._maxX = field(
-            "MaxX", None, "X\s?:\s?(\d+)(?:\s|\\r\\n)")  # noqa
+            "MaxX", None, r"X\s?:\s?(\d+)(?:\s|\r\n)")
         self._maxY = field(
-            "MaxY", None, "Y\s?:\s?(\d+)(?:\s|\\r\\n)")  # noqa
+            "MaxY", None, r"Y\s?:\s?(\d+)(?:\s|\r\n)")
         self._maxZ = field(
-            "MaxZ", None, "Z\s?:\s?(\d+)(?:\s|\\r\\n)")  # noqa
+            "MaxZ", None, r"Z\s?:\s?(\d+)(?:\s|\r\n)")
         self._extruder_count = field(
-            "Extruder Count", None, "Tool Count\s?:\s?(.*?)\\r\\n")  # noqa
+            "Extruder Count", None, r"Tool Count\s?:\s?(.*?)\r\n")
         self._mac_address = field(
-            "Mac Address", None, "Mac Address\s?:\s?([0-9a-fA-F:]+)")  # noqa
+            "Mac Address", None, r"Mac Address\s?:\s?([0-9a-fA-F:]+)")
         self._machine_status = field(
-            "Machine Status", None, "MachineStatus\s?:\s?(.*?)\\r\\n")  # noqa
+            "Machine Status", None, r"MachineStatus\s?:\s?(.*?)\r\n")
         self._move_mode = field(
-            "Move Mode", None, "MoveMode\s?:\s?(.*?)\\r\\n")  # noqa
+            "Move Mode", None, r"MoveMode\s?:\s?(.*?)\r\n")
         self._status = field(
-            "Status", None, "(?:\\n|\A)Status\s?:\s?(.*?)\\r\\n")  # noqa
+            "Status", None, r"(?:\n|\A)Status\s?:\s?(.*?)\r\n")
         self._led = field(
-            "LED", None, "LED\s?:\s?(.*?)\\r\\n")  # noqa
+            "LED", None, r"LED\s?:\s?(.*?)\r\n")
         self._job_file = field(
-            "Current File", None, "CurrentFile\s?:\s?(.*?)\\r\\n")  # noqa
+            "Current File", None, r"CurrentFile\s?:\s?(.*?)\r\n")
         self._extruder_temp = field(
-           "Extruder Temp", None, "(T0)\s?:\s?(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)")  # noqa
+           "Extruder Temp", None, r"(T0)\s?:\s?(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)")
         self._bed_temp = field(
-            "Bed Temp", None, "(B)\s?:\s?(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)")  # noqa
+            "Bed Temp", None, r"(B)\s?:\s?(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)")
         self._print_percent = field(
-            "Print Percent", None, "byte\s?(\d+)/\d+")  # noqa
+            "Print Percent", None, r"byte\s?(\d+)/\d+")
         self._print_layer = field(
-            "Print layer", None, "Layer:\s?(\d+)/(\d+)")  # noqa
+            "Print layer", None, r"Layer:\s?(\d+)/(\d+)")
         self._job_layers = field(
-            "Print Total layer", None, "Layer:\s?\d+/(\d+)")  # noqa
+            "Print Total layer", None, r"Layer:\s?\d+/(\d+)")
 
         self.extruder_tools = ToolHandler()
 
@@ -199,7 +198,7 @@ class Printer(object):
     @property
     def led(self):
         """ 0       1 """
-        return self._led.value
+        return True if self._led.value == "1" else False
 
     @property
     def job_file(self):
@@ -325,5 +324,24 @@ class Printer(object):
             self._print_layer.value = re_result.group(1)
             self._job_layers.value = re_result.group(2)
 
+        if disconnect:
+            await self.network.disconnect()
+
+    async def setLed(self, state: bool, disconnect=True):
+        """Set LED state.
+        Args:
+            state (bool): True = ON, False = OFF
+            disconnect (bool): Disconnect after command. Defaults to True.
+        """
+        if not self.connected:
+            LOG.info("Machine is not connected")
+            await self.connect()
+
+        response = await self.network.sendSetLedState(state)
+        if not response:
+            return
+        
+        self._led.value = "1" if state else "0"
+        
         if disconnect:
             await self.network.disconnect()

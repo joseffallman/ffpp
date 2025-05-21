@@ -225,6 +225,7 @@ class Network(object):
         Returns:
             [string]: Return response from printer.
         """
+        state = 255 if state else 0
         messages = [
             self._getControlRequestMessage,
             f'~M146 r{state} g{state} b{state} F0\r\n',

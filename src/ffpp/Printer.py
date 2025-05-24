@@ -86,7 +86,7 @@ class Printer(object):
 
         # Machine info fields
         self._machine_type = field(
-            "Machine Type", None, "Machine Type\s?:\s?(.*?)\r\n")
+            "Machine Type", None, r"Machine Type\s?:\s?(.*?)\r\n")
         self._machine_name = field(
             "Machine Name", None, r"Machine Name\s?:\s?(.*?)\r\n")
         self._firmware = field(

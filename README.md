@@ -40,7 +40,7 @@ This is the information collected from the printer.
 - myPrinter.status
 - myPrinter.led
 - myPrinter.current_file
-- myPrinter.print_percent
+- myPrinter.print_percent (float, 0.0 - 100.0, also for printers reporting per mille like the Creator 3)
 
 ## To get some temperature you need to get right tool. 
 Run this line to return the extruder tool:
@@ -49,6 +49,8 @@ extruder = myPrinter.extruder_tools.get()
 # or by index
 extruder2 = myPrinter.extruder_tools.get(1)
 ```
+Printers with two extruders (Creator 3) have the tools `t0` and `t1`, up to the
+"Tool Count" the printer reports.
 You can do the same for your bed in myPrinter.bed_tools
 
 Then you can do:

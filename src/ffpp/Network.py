@@ -1,8 +1,17 @@
-import logging
 import asyncio
+import contextlib
+import logging
 import typing
 
 LOG = logging.getLogger(__name__)
+
+CONNECT_TIMEOUT = 5
+# Max time to wait for the printer to start answering a command.
+RESPONSE_TIMEOUT = 5
+# Once the printer started to answer, a response without a trailing "ok" is
+# considered complete when no more data arrives within this time.
+IDLE_TIMEOUT = 0.5
+RESPONSE_END = b'ok\r\n'
 
 
 class Network(object):
@@ -11,61 +20,127 @@ class Network(object):
         self.port = port
         self.connection = None
         self.responseData: typing.Union[list[bytes], None] = None
+        self._reader = None
+        self._writer = None
+        self._lock = None
+
+    @property
+    def lock(self) -> asyncio.Lock:
+        """Lock that makes each sendMessage call exclusive.
+
+        Created on first use, so it belongs to the running event loop.
+        """
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def connect(self):
-        self.connection = asyncio.open_connection(
-            self.ip,
-            self.port,
-        )
-        try:
-            self._reader, self._writer = await asyncio.wait_for(
-                self.connection,
-                timeout=3
-            )
-        except Exception as e:  # CancelError and TimeoutError
-            LOG.debug("Unable to connect")
-            self.connection = None
-            raise TimeoutError(e) from e
+        """Open a new connection to the printer.
 
+        Raises:
+            TimeoutError: Unable to connect.
+        """
+        async with self.lock:
+            await self._connect()
         return True
 
     async def disconnect(self):
-        try:
-            self._writer.close()
-        except Exception:
-            pass
-        self.connection = None
+        async with self.lock:
+            self._close()
         return True
 
-    async def sendMessage(self, messages: typing.List[str], disconnect=True):
-        self.responseData = []
+    async def sendMessage(
+        self,
+        messages: typing.Union[typing.List[str], str],
+        disconnect=True,
+        wait_for_idle=False,
+    ):
+        """Send messages and store one complete response per message.
 
+        The messages are sent as one exclusive sequence, other calls wait
+        until it is done. On any error the connection is closed, so the next
+        call starts with a new connection.
+
+        Args:
+            messages: Message or list of messages to send.
+            disconnect: Close the connection when done.
+            wait_for_idle: Read until the printer stops sending, for
+                responses that continue after the "ok".
+
+        Raises:
+            TimeoutError: The printer didn't answer.
+            ConnectionError: Unable to send or the printer closed the
+                connection.
+        """
         if type(messages) is not list:
             messages = [messages]
 
-        if self.connection is None:
-            await self.connect()
+        async with self.lock:
+            self.responseData = []
+            try:
+                if self.connection is None:
+                    await self._connect()
+                for message in messages:
+                    self._writer.write(message.encode())
+                    await self._writer.drain()  # Wait for it to be sent.
+                    self.responseData.append(
+                        await self._readResponse(wait_for_idle)
+                    )
+            except (TimeoutError, ConnectionError, asyncio.CancelledError):
+                LOG.debug("Unable to send.")
+                self._close()
+                raise
+            except OSError as e:
+                LOG.debug("Unable to send.")
+                self._close()
+                raise ConnectionError(e) from e
 
-        # Send all messages.
+            if disconnect:
+                self._close()
+
+        return len(self.responseData) > 0
+
+    async def _connect(self):
+        self._close()
         try:
-            while len(messages) > 0:
-                send = messages.pop(0)
-                self._writer.write(send.encode())
-                await self._writer.drain()  # Wait for it to be sent.
-                data = await self._reader.read(1024)
-                if data:
-                    self.responseData.append(data)
-        except Exception as e:
-            LOG.debug("Unable to send.")
-            await self.disconnect()
-            raise ConnectionError(e) from e
+            self._reader, self._writer = await asyncio.wait_for(
+                asyncio.open_connection(self.ip, self.port),
+                timeout=CONNECT_TIMEOUT
+            )
+        except (OSError, asyncio.TimeoutError) as e:
+            LOG.debug("Unable to connect")
+            raise TimeoutError(e) from e
+        self.connection = self._writer
 
-        if disconnect:
-            await self.disconnect()
+    def _close(self):
+        if self._writer is not None:
+            with contextlib.suppress(OSError, RuntimeError):
+                self._writer.close()
+        self._reader = None
+        self._writer = None
+        self.connection = None
 
-        if self.responseData and len(self.responseData) > 0:
-            return True
-        return False
+    async def _readResponse(self, wait_for_idle=False) -> bytes:
+        """Read until the response ends with "ok" or the printer goes quiet."""
+        response = b''
+        timeout = RESPONSE_TIMEOUT
+        while True:
+            try:
+                chunk = await asyncio.wait_for(
+                    self._reader.read(4096), timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                if response:
+                    return response
+                raise TimeoutError("No response from printer")
+            if not chunk:
+                if response:
+                    return response
+                raise ConnectionError("Connection closed by printer")
+            response += chunk
+            if not wait_for_idle and response.endswith(RESPONSE_END):
+                return response
+            timeout = IDLE_TIMEOUT
 
     async def sendControlRequest(self, disconnect=True):
         """Send Control message to printer.
@@ -245,7 +320,8 @@ class Network(object):
             [list]: Filenames as string
         """
         # Don't decode this strait away.
-        await self.sendMessage('~M661\r\n', disconnect)
+        # The file names are sent after the "ok".
+        await self.sendMessage('~M661\r\n', disconnect, wait_for_idle=True)
 
         if self.responseData and len(self.responseData) > 0:
             response = self.responseData[0]

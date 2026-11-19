@@ -1,13 +1,73 @@
 import socket
-import typing
 import unittest
 from unittest import mock
 import asyncio
 
 from src.ffpp.Network import Network
+from tests.const_NetworkResponse import (
+    RESPONSE_sendGetFileNamesWithFiles,
+    RESPONSE_sendProgressRequestPerMille,
+    RESPONSE_sendTempRequestTwoExtruders,
+)
 
 PRINTER_IP = "192.168.20.41"
 PRINTER_PORT = 8899
+
+
+def segments(response: bytes, size: int = 7):
+    """Split a response like the printer could do over TCP."""
+    return [response[i:i + size] for i in range(0, len(response), size)]
+
+
+class FakePrinter(object):
+    """Fake connection that answers commands, one segment per loop cycle."""
+
+    def __init__(self):
+        self.answer = True
+        self.connections = 0
+        self.writers = []
+        self.responses = {
+            '~M105\r\n': segments(
+                RESPONSE_sendTempRequestTwoExtruders.encode()),
+            '~M27\r\n': segments(
+                RESPONSE_sendProgressRequestPerMille.encode()),
+            # The file names are sent after the "ok".
+            '~M661\r\n': RESPONSE_sendGetFileNamesWithFiles,
+        }
+
+    async def open_connection(self, *args, **kwargs):
+        self.connections += 1
+        reader = asyncio.StreamReader()
+        writer = FakeWriter(self, reader)
+        self.writers.append(writer)
+        return reader, writer
+
+
+class FakeWriter(object):
+
+    def __init__(self, printer: FakePrinter, reader: asyncio.StreamReader):
+        self.printer = printer
+        self.reader = reader
+        self.closed = False
+
+    def write(self, data: bytes):
+        if not self.printer.answer or self.reader.at_eof():
+            return
+        pending = list(self.printer.responses[data.decode()])
+        loop = asyncio.get_running_loop()
+
+        def feed_next_segment():
+            self.reader.feed_data(pending.pop(0))
+            if pending:
+                loop.call_soon(feed_next_segment)
+
+        loop.call_soon(feed_next_segment)
+
+    async def drain(self):
+        pass
+
+    def close(self):
+        self.closed = True
 
 
 class TestNetworkClass(unittest.IsolatedAsyncioTestCase):
@@ -15,53 +75,87 @@ class TestNetworkClass(unittest.IsolatedAsyncioTestCase):
     """
 
     def setUp(self):
-        self.network = Network(PRINTER_IP, 8899)
-        self.patch_con = mock.patch(
-            'src.ffpp.Network.asyncio',
-            new_callable=mock.AsyncMock
+        self.printer = FakePrinter()
+        patch_connection = mock.patch(
+            'src.ffpp.Network.asyncio.open_connection',
+            new=self.printer.open_connection,
         )
-        self.mock_con = self.patch_con.start()
-        self.mockReturnValue()
+        patch_connection.start()
+        self.addCleanup(patch_connection.stop)
+        self.network = Network(PRINTER_IP, PRINTER_PORT)
 
-    def tearDown(self):
-        self.patch_con.stop()
-
-    def mockReturnValue(
-        self,
-        returnMessage: typing.Union[typing.List[str], str] = []
-    ):
-        # Mock socket connection.
-        reader = mock.AsyncMock()
-        # reader.read.return_value = returnMessage.encode('utf-8')
-
-        if type(returnMessage) is not list:
-            returnMessage = [returnMessage]
-
-        ret = []
-        for msg in returnMessage:
-            ret.append(msg.encode('utf-8'))
-
-        reader.read.side_effect = ret  # returnMessage.encode('utf-8')
-        self.mock_con.wait_for.return_value = (
-            reader,  # reader
-            mock.AsyncMock(),  # writer
-        )
-
-    # @mock.patch('src.ffpp.Network.asyncio', new=mock.AsyncMock)
     async def test_sendMessageUnconnectedConnectionTimeout_exceptionTimeoutError(self):  # noqa
         # Arrange
-        net = Network("")
-        self.mockReturnValue(["Hej", "Två"])
-        self.mock_con.wait_for.side_effect = TimeoutError
+        async def no_connection(*args, **kwargs):
+            raise OSError("Host is unreachable")
 
+        # Act & Assert
+        with mock.patch(
+            'src.ffpp.Network.asyncio.open_connection', new=no_connection
+        ):
+            with self.assertRaises(TimeoutError):
+                await self.network.sendMessage("msg_to_send")
+
+    async def test_splitResponse_readCompletely(self):
         # Act
-        with self.assertRaises(TimeoutError):
-            await net.sendMessage("msg_to_send")
+        temp = await self.network.sendTempRequest(disconnect=False)
+        progress = await self.network.sendProgressRequest()
 
         # Assert
-        # No exception occurred, test responseData
-        # self.assertEqual(mock_socket.socket().connect.call_count, 2)
-        # self.assertFalse(response)
+        self.assertEqual(temp, RESPONSE_sendTempRequestTwoExtruders)
+        self.assertEqual(progress, RESPONSE_sendProgressRequestPerMille)
+        self.assertEqual(self.printer.connections, 1)
+        self.assertTrue(self.printer.writers[0].closed)
+
+    async def test_concurrentRequests_dontInterleave(self):
+        # Act
+        temp, progress = await asyncio.gather(
+            self.network.sendTempRequest(),
+            self.network.sendProgressRequest(),
+        )
+
+        # Assert
+        self.assertEqual(temp, RESPONSE_sendTempRequestTwoExtruders)
+        self.assertEqual(progress, RESPONSE_sendProgressRequestPerMille)
+
+    async def test_noAnswer_exceptionTimeoutErrorAndReconnect(self):
+        # Arrange
+        self.printer.answer = False
+
+        # Act
+        with mock.patch('src.ffpp.Network.RESPONSE_TIMEOUT', 0.01):
+            with self.assertRaises(TimeoutError):
+                await self.network.sendTempRequest(disconnect=False)
+
+        # Assert, the broken connection isn't reused.
+        self.assertTrue(self.printer.writers[0].closed)
+        self.printer.answer = True
+        temp = await self.network.sendTempRequest()
+        self.assertEqual(temp, RESPONSE_sendTempRequestTwoExtruders)
+        self.assertEqual(self.printer.connections, 2)
+
+    async def test_connectionClosedByPrinter_exceptionConnectionError(self):
+        # Arrange
+        await self.network.sendTempRequest(disconnect=False)
+        self.printer.writers[0].reader.feed_eof()
+
+        # Act
+        with self.assertRaises(ConnectionError):
+            await self.network.sendTempRequest(disconnect=False)
+
+        # Assert, the closed connection isn't reused.
+        self.assertTrue(self.printer.writers[0].closed)
+        temp = await self.network.sendTempRequest()
+        self.assertEqual(temp, RESPONSE_sendTempRequestTwoExtruders)
+        self.assertEqual(self.printer.connections, 2)
+
+    async def test_getFileNames_readAfterOk(self):
+        # Act
+        with mock.patch('src.ffpp.Network.IDLE_TIMEOUT', 0.05):
+            files = await self.network.sendGetFileNames()
+
+        # Assert
+        self.assertEqual(files, ['/data/box.gx', '/data/cube.gx'])
 
 
 class TestNetworkCommunicateWithPrinter(unittest.IsolatedAsyncioTestCase):

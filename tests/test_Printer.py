@@ -10,16 +10,20 @@ from tests.const_NetworkResponse import (
     RESPONSE_sendControlRequestTrue,
     # RESPONSE_sendGetFileNames,
     RESPONSE_sendInfoRequest,
+    RESPONSE_sendInfoRequestTwoExtruders,
     RESPONSE_sendPauseRequest,
     RESPONSE_sendPositionRequest,
     RESPONSE_sendPrintRequest,
     RESPONSE_sendProgressRequest,
     RESPONSE_sendProgressRequest2,
+    RESPONSE_sendProgressRequestBytes,
+    RESPONSE_sendProgressRequestPerMille,
     RESPONSE_sendSetTemperature,
     RESPONSE_sendStatusRequest,
     RESPONSE_sendStatusRequest2,
     RESPONSE_sendTempRequest,
     RESPONSE_sendTempRequest2,
+    RESPONSE_sendTempRequestTwoExtruders,
     RESPONSE_sendsetLedState
 )
 
@@ -178,7 +182,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.printer.status, "S:1 L:0 J:0 F:0")
         self.assertEqual(self.printer.led, False)
         self.assertEqual(self.printer.job_file, "")
-        self.assertEqual(self.printer.print_percent, "0")
+        self.assertEqual(self.printer.print_percent, 0.0)
 
     async def test_getUpdateProgress_getCorrectInfo(self):
         # Arrage
@@ -212,7 +216,7 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
             "Current file gave wrong response"
         )
         self.assertEqual(
-            self.printer.print_percent, "11",
+            self.printer.print_percent, 11.0,
             "Percent gave wrong response"
         )
         self.assertEqual(
@@ -257,6 +261,57 @@ class test_PrinterClass(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(len(self.printer.bed_tools) == 1)
         self.assertTrue(bed.now == 14)
         self.assertTrue(bed.target == 0)
+
+    async def test_getTwoExtrudersTemp_getTemp(self):
+        # Arrage
+        self.mock_net().sendInfoRequest. \
+            return_value = RESPONSE_sendInfoRequestTwoExtruders
+        self.mock_net().sendTempRequest. \
+            return_value = RESPONSE_sendTempRequestTwoExtruders
+
+        # Act
+        await self.printer.update()
+        extruder0 = self.printer.extruder_tools.get("T0")
+        extruder1 = self.printer.extruder_tools.get("T1")
+        bed = self.printer.bed_tools.get()
+
+        # Assert
+        self.assertEqual(len(self.printer.extruder_tools), 2)
+        self.assertEqual((extruder0.now, extruder0.target), (210.0, 210.0))
+        self.assertEqual((extruder1.now, extruder1.target), (33.0, 0.0))
+        self.assertEqual((bed.now, bed.target), (45.0, 45.0))
+
+    async def test_getProgressPerMille_getPercent(self):
+        # Arrage
+        self.mock_net().sendProgressRequest. \
+            return_value = RESPONSE_sendProgressRequestPerMille
+
+        # Act
+        await self.printer.update()
+
+        # Assert
+        self.assertEqual(self.printer.print_percent, 46.1)
+
+    async def test_getProgressBytes_getPercent(self):
+        # Arrage
+        self.mock_net().sendProgressRequest. \
+            return_value = RESPONSE_sendProgressRequestBytes
+
+        # Act
+        await self.printer.update()
+
+        # Assert
+        self.assertEqual(self.printer.print_percent, 100.0)
+
+    async def test_updateEmptyResponse_exceptionConnectionError(self):
+        # Arrage
+        await self.printer.connect()
+        self.mock_net().sendStatusRequest.return_value = ""
+
+        # Act & Assert
+        with self.assertRaises(ConnectionError):
+            await self.printer.update()
+        self.mock_net().disconnect.assert_called()
 
     async def test_toolHandlerAddsameName_CorrectCount(self):
         # Arrange

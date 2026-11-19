@@ -114,11 +114,11 @@ class Printer(object):
         self._job_file = field(
             "Current File", None, r"CurrentFile\s?:\s?(.*?)\r\n")
         self._extruder_temp = field(
-           "Extruder Temp", None, r"(T0)\s?:\s?(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)")
+           "Extruder Temp", None, r"(T(\d+))\s?:\s?(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)")
         self._bed_temp = field(
             "Bed Temp", None, r"(B)\s?:\s?(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)")
         self._print_percent = field(
-            "Print Percent", None, r"byte\s?(\d+)/\d+")
+            "Print Percent", None, r"byte\s?(\d+)\s?/\s?(\d+)")
         self._print_layer = field(
             "Print layer", None, r"Layer:\s?(\d+)/(\d+)")
         self._job_layers = field(
@@ -207,6 +207,7 @@ class Printer(object):
 
     @property
     def print_percent(self):
+        """ Print progress in percent as float, 0.0 - 100.0 """
         return self._print_percent.value
 
     @property
@@ -223,8 +224,10 @@ class Printer(object):
             await self.connect()
 
         response = await self.network.sendInfoRequest(disconnect=False)
+        if disconnect:
+            await self.network.disconnect()
         if not response:
-            return
+            raise ConnectionError("Empty response from printer")
 
         dataField = [
             self._machine_type,
@@ -243,15 +246,25 @@ class Printer(object):
             if re_result:
                 field.value = re_result.group(1)
 
-        if disconnect:
-            await self.network.disconnect()
-
     async def update(self, disconnect=True):
         if not self.connected:
             LOG.info("Machine is not connected")
             await self.connect()
 
-        # Update current status etc.
+        status = await self.network.sendStatusRequest(disconnect=False)
+        temps = await self.network.sendTempRequest(disconnect=False)
+        progress = await self.network.sendProgressRequest(disconnect=False)
+        if disconnect:
+            await self.network.disconnect()
+
+        if not (status and temps and progress):
+            raise ConnectionError("Empty response from printer")
+
+        self._parseStatus(status)
+        self._parseTemperatures(temps)
+        self._parseProgress(progress)
+
+    def _parseStatus(self, response: str):
         """
         'CMD M119 Received.\r\n
         Endstop: X-max:0 Y-max:0 Z-max:0\r\n
@@ -262,10 +275,6 @@ class Printer(object):
         CurrentFile: \r\n
         ok\r\n'
         """
-        response = await self.network.sendStatusRequest(disconnect=False)
-        if not response:
-            return
-
         dataField = [
             self._machine_status,
             self._move_mode,
@@ -279,53 +288,50 @@ class Printer(object):
             if re_result:
                 field.value = re_result.group(1)
 
-        # Update temperatures.
+    def _parseTemperatures(self, response: str):
         """
-        'CMD M105 Received.\r\nT0:22/0 B:14/0\r\nok\r\n'
-        """
-        response = await self.network.sendTempRequest(disconnect=False)
-        if not response:
-            return
+        'CMD M105 Received.\r\nT0:210/210 T1:33/0 B:45/45\r\nok\r\n'
 
-        re_result = self._extruder_temp.regex.search(response)
-        if re_result:
-            name = re_result.group(1)
-            now = re_result.group(2)
-            target = re_result.group(3)
-            t = temperatures(name, now, target)
-            self.extruder_tools.add(t)
+        Some single extruder printers (Adventurer 5M) also report T1, so
+        only the extruders in "Tool Count" are used when it's known.
+        """
+        try:
+            extruder_count = int(self.extruder_count)
+        except (TypeError, ValueError):
+            extruder_count = None
+
+        for re_result in self._extruder_temp.regex.finditer(response):
+            name, index, now, target = re_result.groups()
+            if extruder_count is not None and int(index) >= extruder_count:
+                continue
+            self.extruder_tools.add(temperatures(name, now, target))
 
         re_result = self._bed_temp.regex.search(response)
         if re_result:
             name = re_result.group(1)
             now = re_result.group(2)
             target = re_result.group(3)
-            t = temperatures(name, now, target)
-            self.bed_tools.add(t)
-            # self._bed_temp.value = re_result.group(2)
-            # self._bed_target_temp.value = re_result.group(3)
+            self.bed_tools.add(temperatures(name, now, target))
 
-        # Update print progress.
+    def _parseProgress(self, response: str):
         """
-        'CMD M27 Received.\r\nSD printing byte 0/100\r\nok\r\n'
-        """
-        response = await self.network.sendProgressRequest(disconnect=False)
-        if not response:
-            return
+        'CMD M27 Received.\r\nSD printing byte 11/100\r\nLayer: 44/419\r\nok\r\n'
 
-        # Print percent.
+        The total is 100 or 1000 (Creator 3), older firmware reports the
+        bytes of the file.
+        """
         re_result = self._print_percent.regex.search(response)
         if re_result:
-            self._print_percent.value = re_result.group(1)
+            done = int(re_result.group(1))
+            total = int(re_result.group(2))
+            percent = done * 100 / total if total else 0.0
+            self._print_percent.value = round(min(percent, 100.0), 1)
 
         # Print layer and total layer.
         re_result = self._print_layer.regex.search(response)
         if re_result:
             self._print_layer.value = re_result.group(1)
             self._job_layers.value = re_result.group(2)
-
-        if disconnect:
-            await self.network.disconnect()
 
     async def setLed(self, state: bool, disconnect=True):
         """Set LED state.

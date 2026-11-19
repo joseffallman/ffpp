@@ -109,3 +109,27 @@ RESPONSE_sendPrintRequest = (
 RESPONSE_sendAbortRequest = (
     'CMD M26 Received.\r\n'
 )
+
+# Creator 3, two extruders.
+RESPONSE_sendInfoRequestTwoExtruders = RESPONSE_sendInfoRequest.replace(
+    'Tool Count: 1', 'Tool Count: 2'
+)
+RESPONSE_sendTempRequestTwoExtruders = (
+    'CMD M105 Received.\r\nT0:210/210 T1:33/0 B:45/45\r\nok\r\n'
+)
+# Creator 3 reports the progress in per mille.
+RESPONSE_sendProgressRequestPerMille = (
+    'CMD M27 Received.\r\nSD printing byte 461/1000\r\nok\r\n'
+)
+# Older firmware reports the bytes of the file.
+RESPONSE_sendProgressRequestBytes = (
+    'CMD M27 Received.\r\nSD printing byte 5525653/5525652\r\nok\r\n'
+)
+
+# GetFileNamesRequest, as segments. The file names are sent after the "ok".
+RESPONSE_sendGetFileNamesWithFiles = [
+    b'CMD M661 Received.\r\nok\r\n',
+    b'D\xaa\xaa\x00\x00\x00\x02'
+    b'::\xa3\xa3\x00\x00\x00\x0c/data/box.gx'
+    b'::\xa3\xa3\x00\x00\x00\x0d/data/cube.gx',
+]
